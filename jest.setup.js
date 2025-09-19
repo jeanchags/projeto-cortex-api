@@ -2,12 +2,17 @@
  * @fileoverview Arquivo de setup global para o Jest.
  * Gerencia a inicialização e o encerramento do banco de dados em memória
  * e limpa o banco após cada teste.
- * @version 1.1
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import dotenv from 'dotenv';
+
+// Carrega as variáveis de ambiente do arquivo .env para o process.env
+// Isso garante que o JWT_SECRET esteja disponível para os testes de integração.
+dotenv.config();
 
 let mongoServer;
 
@@ -21,8 +26,10 @@ beforeAll(async () => {
 
     // Opções para evitar warnings de depreciação (embora o Mongoose 6+ lide bem com isso)
     const mongooseOpts = {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
+        // useNewUrlParser e useUnifiedTopology são depreciados no Mongoose 6+
+        // mas os mantemos se a versão do driver Mongoose no log ainda os mencionar.
+        // Se estivermos no Mongoose 8 (como no package.json), eles não são necessários,
+        // mas não causam danos.
     };
 
     await mongoose.connect(uri, mongooseOpts);

@@ -1,72 +1,124 @@
 /**
- * @fileoverview Define o schema e o modelo Mongoose para a entidade User.
- * @version 1.0
+ * @fileoverview Schema e Modelo do Usuário para o MongoDB usando Mongoose.
+ * @version 1.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-/**
- * @schema UserSchema
- * @description Schema do Mongoose para a coleção de usuários.
- *
- * @property {String} name - Nome do usuário. Campo obrigatório.
- * @property {String} email - Endereço de e-mail do usuário. Único, obrigatório e armazenado em minúsculas.
- * @property {String} authProviderUid - ID único do provedor de autenticação (ex: Firebase UID). Campo obrigatório e indexado.
- * @property {String} role - Função do usuário no sistema. Pode ser 'COMMON' ou 'ADMIN'. O padrão é 'COMMON'.
- * @property {Boolean} isActive - Status do usuário. Indica se o usuário está ativo ou não. O padrão é 'true'.
- * @property {Date} createdAt - Timestamp da criação do documento. Gerado automaticamente.
- * @property {Date} updatedAt - Timestamp da última atualização do documento. Gerado automaticamente.
- */
-const UserSchema = new mongoose.Schema(
-    {
-        name: {
-            type: String,
-            required: [true, 'O campo "name" é obrigatório.'],
-            trim: true,
-        },
-        email: {
-            type: String,
-            required: [true, 'O campo "email" é obrigatório.'],
-            unique: true,
-            lowercase: true,
-            trim: true,
-            match: [/^\S+@\S+\.\S+$/, 'Por favor, forneça um endereço de e-mail válido.'],
-        },
-        authProviderUid: {
-            type: String,
-            required: [true, 'O campo "authProviderUid" é obrigatório.'],
-            index: true,
-        },
-        role: {
-            type: String,
-            required: true,
-            enum: {
-                values: ['COMMON', 'ADMIN'],
-                message: '{VALUE} não é uma função válida.',
-            },
-            default: 'COMMON',
-        },
-        isActive: {
-            type: Boolean,
-            required: true,
-            default: true,
-        },
+const userSchema = new mongoose.Schema({
+    /**
+     * O nome completo do usuário.
+     * @type {string}
+     */
+    name: {
+        type: String,
+        required: [true, 'O campo "name" é obrigatório.'],
     },
-    {
-        /**
-         * @option timestamps
-         * @description Adiciona os campos createdAt e updatedAt automaticamente.
-         */
-        timestamps: true,
-    }
-);
+
+    /**
+     * O endereço de e-mail do usuário.
+     * É único, obrigatório e armazenado em minúsculas.
+     * @type {string}
+     */
+    email: {
+        type: String,
+        required: [true, 'O campo "email" é obrigatório.'],
+        unique: true,
+        lowercase: true,
+        trim: true,
+        match: [
+            /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+            'Por favor, forneça um endereço de e-mail válido.',
+        ],
+    },
+
+    /**
+     * A senha do usuário.
+     * Necessária apenas para autenticação via e-mail/senha.
+     * @type {string}
+     */
+    password: {
+        type: String,
+        required: function() {
+            // Torna a senha obrigatória apenas se não houver um provedor de autenticação externo.
+            return !this.authProviderUid;
+        },
+        minlength: [6, 'A senha deve ter no mínimo 6 caracteres.'],
+    },
+
+    /**
+     * O UID (User ID) do provedor de autenticação externo (ex: Google, Facebook).
+     * @type {string}
+     */
+    authProviderUid: {
+        type: String,
+        // Correção: Torna o UID obrigatório apenas se a senha não for fornecida.
+        required: function() {
+            return !this.password;
+        },
+        unique: true,
+        sparse: true, // Permite múltiplos documentos com valor nulo, mas garante unicidade para os que não são nulos.
+    },
+
+
+    /**
+     * A função do usuário no sistema.
+     * @type {string}
+     * @enum ['ADMIN', 'COMMON']
+     * @default 'COMMON'
+     */
+    role: {
+        type: String,
+        enum: {
+            values: ['ADMIN', 'COMMON'], // Conforme arquitetura  (e spec [cite: 237] que usa 'NUTRITIONIST', mas o enum atual só tem ADMIN/COMMON)
+            message: '{VALUE} não é uma função válida.',
+        },
+        default: 'COMMON',
+    },
+
+    /**
+     * @correção (Adicionado v1.3)
+     * Status do usuário. Conforme a arquitetura.
+     * @type {boolean}
+     * @default true
+     */
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+
+}, {
+    /**
+     * Opções do Schema:
+     * - timestamps: Adiciona os campos createdAt e updatedAt automaticamente.
+     */
+    timestamps: true,
+});
+
 
 /**
- * @model User
- * @description Modelo Mongoose para a entidade 'User'.
- * Se o modelo já existir, ele é reutilizado; caso contrário, um novo modelo é criado.
+ * Middleware (hook) do Mongoose que é executado antes de salvar o documento.
+ * Se a senha foi modificada, faz o hash dela usando bcrypt.
  */
-const User = mongoose.models.User || mongoose.model('User', UserSchema);
+userSchema.pre('save', async function(next) {
+    // Executa a função apenas se a senha foi modificada (ou é nova) e se a senha existe (não é login social)
+    if (!this.isModified('password') || !this.password) {
+        return next();
+    }
+
+    // Gera o salt e faz o hash da senha
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+
+const User = mongoose.model('User', userSchema);
 
 export default User;
