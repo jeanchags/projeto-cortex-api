@@ -1,39 +1,71 @@
-/**
- * @fileoverview Controller para lidar com a lógica de autenticação.
- * @version 1.1
- * @author Jean Chagas Fernandes - Studio Fix
- */
-
 import { validationResult } from 'express-validator';
 import * as authService from '../services/authService.js';
+import User from '../models/User.js';
 
 /**
- * Registra um novo usuário no sistema.
- * A validação do corpo da requisição é delegada para o middleware express-validator.
- * @param {import('express').Request} req - O objeto de requisição do Express.
- * @param {import('express').Response} res - O objeto de resposta do Express.
+ * @function register
+ * @description Registra um novo usuário no sistema.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
  */
 export const register = async (req, res) => {
-    // 1. Extrai os erros de validação da requisição.
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        // Se houver erros, retorna uma resposta 400 com os detalhes.
         return res.status(400).json({
             message: 'A validação dos dados falhou.',
             details: errors.array(),
         });
     }
 
-    // 2. Extrai os dados validados do corpo da requisição.
-    const { name, email, password } = req.body;
-
     try {
-        // 3. Chama o serviço de autenticação para criar o usuário.
-        const { user, token } = await authService.registerUser({ name, email, password });
+        const { name, email, password } = req.body;
 
-        // 4. Retorna uma resposta 201 (Created) com os dados do usuário e o token.
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({ message: 'E-mail já cadastrado.' });
+        }
+
+        const { newUser, token } = await authService.registerUser({ name, email, password });
+
         return res.status(201).json({
             message: 'Usuário registrado com sucesso!',
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+            },
+            token,
+        });
+
+    } catch (error) {
+        console.error('Erro no registro do usuário:', error);
+        return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    }
+};
+
+
+/**
+ * @function login
+ * @description Autentica um usuário e retorna um token JWT.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
+ */
+export const login = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            message: 'A validação dos dados falhou.',
+            details: errors.array(),
+        });
+    }
+
+    try {
+        const { email, password } = req.body;
+
+        const { user, token } = await authService.loginUser({ email, password });
+
+        return res.status(200).json({
+            message: 'Login realizado com sucesso!',
             user: {
                 id: user._id,
                 name: user.name,
@@ -41,14 +73,13 @@ export const register = async (req, res) => {
             },
             token,
         });
+
     } catch (error) {
-        // 5. Tratamento de erros de serviço (ex: e-mail duplicado).
-        if (error.message.includes('E-mail já cadastrado')) {
-            return res.status(409).json({ message: error.message });
+        if (error.message === 'Credenciais inválidas' || error.message === 'Usuário não encontrado') {
+            return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
         }
 
-        // 6. Tratamento de outros erros inesperados.
-        console.error('Erro no registro do usuário:', error);
+        console.error('Erro no login do usuário:', error);
         return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
 };

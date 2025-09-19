@@ -1,57 +1,41 @@
 /**
- * @fileoverview Arquivo de setup global para o Jest.
- * Gerencia a inicialização e o encerramento do banco de dados em memória
- * e limpa o banco após cada teste.
- * @version 1.2
- * @author Jean Chagas Fernandes - Studio Fix
+ * @fileoverview Configuração global do Jest.
+ * Inicia um servidor MongoDB in-memory e carrega variáveis de ambiente.
+ * @version 2.1
+ * @author Jean Chagas Fernandes - Studio Fix (Modificado por Desenvolvedor Full-Stack)
  */
 
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'; // 1. Importar o dotenv
 
-// Carrega as variáveis de ambiente do arquivo .env para o process.env
-// Isso garante que o JWT_SECRET esteja disponível para os testes de integração.
-dotenv.config();
+// 2. Carregar variáveis de ambiente do arquivo .env
+// Isso é crucial para que process.env.JWT_SECRET esteja disponível
+dotenv.config({ path: '.env' });
 
+// Instância do servidor in-memory
 let mongoServer;
 
 /**
- * Hook que roda UMA VEZ antes de TODA a suíte de testes.
- * Inicializa o MongoMemoryServer e conecta o Mongoose.
+ * Hook que é executado UMA VEZ antes de TODAS as suítes de teste.
+ * Inicia um servidor MongoDB in-memory e estabelece a conexão do Mongoose.
  */
 beforeAll(async () => {
+    // Cria e inicia uma nova instância do MongoDB in-memory
     mongoServer = await MongoMemoryServer.create();
-    const uri = mongoServer.getUri();
 
-    // Opções para evitar warnings de depreciação (embora o Mongoose 6+ lide bem com isso)
-    const mongooseOpts = {
-        // useNewUrlParser e useUnifiedTopology são depreciados no Mongoose 6+
-        // mas os mantemos se a versão do driver Mongoose no log ainda os mencionar.
-        // Se estivermos no Mongoose 8 (como no package.json), eles não são necessários,
-        // mas não causam danos.
-    };
+    // Obtém a URI de conexão do servidor in-memory
+    const mongoUri = mongoServer.getUri();
 
-    await mongoose.connect(uri, mongooseOpts);
+    // Conecta o Mongoose a essa URI.
+    await mongoose.connect(mongoUri);
 });
 
 /**
- * Hook que roda UMA VEZ depois de TODA a suíte de testes.
- * Desconecta o Mongoose e para o MongoMemoryServer.
+ * Hook que é executado UMA VEZ após TODAS as suítes de teste.
+ * Encerra a conexão com o Mongoose e para o servidor in-memory.
  */
 afterAll(async () => {
     await mongoose.disconnect();
-    await mongoServer.stop();
-});
-
-/**
- * Hook que roda DEPOIS DE CADA teste (bloco `it`).
- * Limpa todas as coleções do banco de dados para garantir isolamento.
- */
-afterEach(async () => {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-        const collection = collections[key];
-        await collection.deleteMany({});
-    }
+    await mongoServer.stop(); // Para o servidor in-memory
 });

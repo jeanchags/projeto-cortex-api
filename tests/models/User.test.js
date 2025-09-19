@@ -1,138 +1,116 @@
 /**
  * @fileoverview Testes de unidade para o modelo User.
- * @version 1.3
- * @author Jean Chagas Fernandes - Studio Fix
+ * @version 1.6
+ * @author Jean Chagas Fernandes - Studio Fix (Modificado por Desenvolvedor Full-Stack)
  */
-
-import User from '@/src/models/User.js';
+import mongoose from 'mongoose';
+import User from '../../src/models/User.js';
 
 describe('User Model Test', () => {
 
-    // A configuração e limpeza do banco de dados em memória são gerenciadas
-    // globalmente pelo arquivo jest.setup.js.
+    // A conexão com o banco de dados é gerenciada globalmente pelo jest.setup.js
 
-    /**
-     * @test {User Model} - Sucesso
-     * @description Testa a criação bem-sucedida de um usuário com dados válidos.
-     */
+    // Hook para limpar a coleção de usuários antes de cada teste.
+    beforeEach(async () => {
+        await User.deleteMany({});
+    });
+
     it('should create a user successfully with all valid data', async () => {
         const userData = {
-            name: 'Joana Mendes',
-            email: 'joana.mendes@email.com',
-            authProviderUid: 'firebase-uid-123',
+            name: 'João da Silva',
+            email: 'joao.silva@email.com',
+            password: 'password123',
             role: 'ADMIN',
         };
         const user = new User(userData);
         const savedUser = await user.save();
-
         expect(savedUser._id).toBeDefined();
         expect(savedUser.name).toBe(userData.name);
         expect(savedUser.email).toBe(userData.email);
+        expect(savedUser.password).toBeDefined();
         expect(savedUser.role).toBe(userData.role);
-        expect(savedUser.authProviderUid).toBe(userData.authProviderUid);
-        expect(savedUser.isActive).toBe(true);
         expect(savedUser.createdAt).toBeDefined();
     });
 
-    /**
-     * @test {User Model} - Falha (Campo Obrigatório Faltando)
-     * @description Testa a falha ao criar um usuário sem o campo 'email'.
-     */
-    it('should fail to create a user when a required field (email) is not provided', async () => {
+    it('should fail to create a user without a required field (email)', async () => {
         const userData = {
-            name: 'Usuário Sem Email',
-            authProviderUid: 'firebase-uid-456',
+            name: 'Maria Sem Email',
+            password: 'password123',
         };
         const user = new User(userData);
-        // Usamos rejects.toThrow() para validar que a promessa é rejeitada.
-        await expect(user.save()).rejects.toThrow('User validation failed: email: O campo "email" é obrigatório.');
+        let err;
+        try {
+            await user.save();
+        } catch (error) {
+            err = error;
+        }
+        expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
+        expect(err.errors.email).toBeDefined();
     });
 
-    /**
-     * @test {User Model} - Refatorado: Falha (E-mail duplicado)
-     * @description Testa a falha ao criar um usuário com um e-mail que já existe,
-     * verificando o código de erro específico do MongoDB (11000).
-     */
-    it('should fail to create a user with a duplicate email with error code 11000', async () => {
-        // Cria o primeiro usuário
-        await User.create({
-            name: 'Usuário Original',
-            email: 'duplicado@email.com',
-            authProviderUid: 'firebase-uid-789',
-        });
+    it('should fail to create a user with a duplicate email', async () => {
+        expect.assertions(1);
 
-        // Tenta criar o segundo usuário com o mesmo e-mail
-        const duplicateUser = new User({
-            name: 'Usuário Duplicado',
-            email: 'duplicado@email.com',
-            authProviderUid: 'firebase-uid-101',
-        });
+        // CORREÇÃO A: A senha '123' era inválida (menos de 6 caracteres).
+        // Usar uma senha válida para o primeiro usuário.
+        const userData = { name: 'Duplicado', email: 'duplicado@email.com', password: 'password123' };
+        const user1 = new User(userData);
+        await user1.save(); // Agora isso deve funcionar
 
-        // A asserção agora espera que a promessa seja rejeitada e que o erro
-        // contenha um objeto com a propriedade 'code' igual a 11000.
-        await expect(duplicateUser.save()).rejects.toMatchObject({ code: 11000 });
+        const user2 = new User(userData);
+        try {
+            await user2.save(); // Isso deve falhar com o erro de duplicidade
+        } catch (error) {
+            expect(error.code).toBe(11000); // A asserção de duplicidade
+        }
     });
 
 
-    /**
-     * @test {User Model} - Corrigido: Falha (Role inválida)
-     * @description Testa a falha ao criar um usuário com uma 'role' que não está no Enum.
-     */
     it('should fail to create a user with an invalid role', async () => {
         const userData = {
-            name: 'Usuário Role Inválida',
+            name: 'Role Inválida',
             email: 'role.invalida@email.com',
-            authProviderUid: 'firebase-uid-112',
-            role: 'PACIENTE', // Valor inválido
+            password: 'password123',
+            role: 'PACIENTE'
         };
         const user = new User(userData);
-        // Correção: a mensagem de erro real do Mongoose não inclui as crases (` `)
+
+        // CORREÇÃO B: Remover as crases (`) da string esperada
+        // para corresponder exatamente à mensagem de erro do Mongoose.
         await expect(user.save()).rejects.toThrow('User validation failed: role: PACIENTE não é uma função válida.');
     });
 
-    /**
-     * @test {User Model} - Novo: Edge Case (trim no e-mail)
-     * @description Deve salvar o e-mail sem espaços no início ou no fim.
-     */
-    it('should save the email without leading/trailing spaces', async () => {
+
+    it('should trim the email before saving', async () => {
         const emailWithSpaces = '  teste.trim@email.com  ';
         const user = new User({
             name: 'Teste Trim',
             email: emailWithSpaces,
-            authProviderUid: 'firebase-uid-trim',
+            password: 'password123'
         });
         const savedUser = await user.save();
         expect(savedUser.email).toBe('teste.trim@email.com');
     });
 
-    /**
-     * @test {User Model} - Novo: Edge Case (lowercase no e-mail)
-     * @description Deve salvar o e-mail completamente em minúsculas.
-     */
-    it('should save the email in all lowercase', async () => {
+    it('should convert the email to lowercase before saving', async () => {
         const emailWithUppercase = 'Teste.CASE@Email.com';
         const user = new User({
             name: 'Teste Case',
             email: emailWithUppercase,
-            authProviderUid: 'firebase-uid-case',
+            password: 'password123'
         });
         const savedUser = await user.save();
         expect(savedUser.email).toBe('teste.case@email.com');
     });
 
-    /**
-     * @test {User Model} - Novo: Edge Case (valor padrão da role)
-     * @description Deve atribuir a role 'COMMON' por padrão se nenhuma for fornecida.
-     */
-    it('should default the role to "COMMON" if not provided', async () => {
-        const userWithoutRole = new User({
-            name: 'Usuário Comum',
+    it('should assign the default role "COMMON" if none is provided', async () => {
+        const user = new User({
+            name: 'Usuario Comum',
             email: 'comum@email.com',
-            authProviderUid: 'firebase-uid-default',
+            password: 'password123'
         });
-        const savedUser = await userWithoutRole.save();
+        const savedUser = await user.save();
         expect(savedUser.role).toBe('COMMON');
     });
 
 });
-

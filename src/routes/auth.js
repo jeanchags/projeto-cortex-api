@@ -1,43 +1,34 @@
-/**
- * @fileoverview Define as rotas para o recurso de autenticação.
- * @version 1.1
- * @author Jean Chagas Fernandes - Studio Fix
- */
+import express from 'express';
+import { check } from 'express-validator';
+import { register, login } from '../controllers/authController.js';
 
-import { Router } from 'express';
-import { body } from 'express-validator';
-import * as authController from '../controllers/authController.js';
+const router = express.Router();
 
-const router = Router();
+// Cadeia de validação para o endpoint de registro
+const registerValidation = [
+    check('name', 'O nome é obrigatório.').not().isEmpty(),
+    check('email', 'Por favor, inclua um e-mail válido.').isEmail(),
+    check('password', 'A senha deve conter no mínimo 6 caracteres.').isLength({ min: 6 }),
+];
+
+// Cadeia de validação para o endpoint de login
+const loginValidation = [
+    check('email', 'Por favor, inclua um e-mail válido.').isEmail(),
+    check('password', 'A senha é obrigatória.').not().isEmpty(),
+];
 
 /**
  * @route   POST /api/v1/auth/register
  * @desc    Registra um novo usuário
  * @access  Public
- * @middlewares
- * - body('name'): Valida se o nome não está vazio.
- * - body('email'): Valida se o e-mail é válido.
- * - body('password'): Valida se a senha tem no mínimo 6 caracteres.
  */
-router.post(
-    '/register',
-    [
-        // Middleware de validação para o nome.
-        body('name', 'O campo "name" é obrigatório e não pode estar vazio.')
-            .notEmpty()
-            .trim(),
+router.post('/register', registerValidation, register);
 
-        // Middleware de validação para o e-mail.
-        body('email', 'Por favor, inclua um e-mail válido.')
-            .isEmail()
-            .normalizeEmail(),
-
-        // Middleware de validação para a senha.
-        body('password', 'A senha deve conter no mínimo 6 caracteres.')
-            .isLength({ min: 6 }),
-    ],
-    authController.register
-);
-
+/**
+ * @route   POST /api/v1/auth/login
+ * @desc    Autentica um usuário e obtém o token
+ * @access  Public
+ */
+router.post('/login', loginValidation, login);
 
 export default router;
