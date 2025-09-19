@@ -1,7 +1,7 @@
 /**
  * @fileoverview Serviço de autenticação para interagir com o provedor de identidade.
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fixk
  */
 
 // Em um ambiente real, importaríamos o SDK do Firebase/Identity Platform aqui.

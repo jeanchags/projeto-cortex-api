@@ -1,7 +1,7 @@
 /**
  * @fileoverview Define o schema e o modelo Mongoose para a entidade User.
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import mongoose from 'mongoose';

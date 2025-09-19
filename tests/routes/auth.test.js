@@ -1,7 +1,7 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação (Auth).
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import request from 'supertest';

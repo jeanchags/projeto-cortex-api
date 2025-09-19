@@ -1,7 +1,7 @@
 /**
  * @fileoverview Testes unitários para o modelo User do Mongoose.
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import mongoose from 'mongoose';

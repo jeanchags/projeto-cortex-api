@@ -1,7 +1,7 @@
 /**
- @fileoverview Configuração do Jest para o ambiente de testes.
- @version 1.0
- @author Desenvolvedor Full-Stack
+ * @fileoverview Configuração do Jest para o ambiente de testes.
+ * @version 1.1
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 export default {
     // Indica ao Jest para usar o JSDOM para simular um ambiente de navegador (não necessário para back-end, mas boa prática)
@@ -9,7 +9,7 @@ export default {
 
     // Transforma arquivos usando o babel-jest
     transform: {
-        '^.+\.js$': 'babel-jest',
+        '^.+\\.js$': 'babel-jest',
     },
 
     // Ignora a pasta node_modules ao procurar por arquivos de teste
@@ -18,7 +18,6 @@ export default {
     // Habilita o suporte a módulos ES6
     moduleFileExtensions: ['js', 'json', 'node'],
 
-    // Corrige um erro comum com o mongodb-memory-server no Jest
     // Aumenta o timeout padrão para testes assíncronos
     testTimeout: 60000,
 
@@ -26,4 +25,7 @@ export default {
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/$1',
     },
+
+    // Arquivo de setup para os testes
+    setupFilesAfterEnv: ['./tests/setup.js'],
 };

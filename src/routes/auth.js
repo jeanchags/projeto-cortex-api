@@ -1,7 +1,7 @@
 /**
  * @fileoverview Define as rotas para o módulo de Autenticação.
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import { Router } from 'express';

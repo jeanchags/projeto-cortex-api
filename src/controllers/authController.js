@@ -1,7 +1,7 @@
 /**
  * @fileoverview Controller para lidar com autenticação de usuários.
  * @version 1.0
- * @author Desenvolvedor Full-Stack
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import User from '@/src/models/User.js';
