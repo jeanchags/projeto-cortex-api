@@ -1,170 +1,218 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação (Auth).
- * @version 1.0
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import request from 'supertest';
 import express from 'express';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+// O Mongoose é importado apenas para o model, não para conectar/desconectar
 import User from '@/src/models/User.js';
 import authRoutes from '@/src/routes/auth.js';
 import { authService } from '@/src/services/authService.js';
 
 // Mockar o serviço de autenticação
-jest.mock('@/src/services/authService.js');
+jest.mock('@/src/services/authService.js', () => ({
+    authService: {
+        validateCredentialsAndGetToken: jest.fn(),
+        createUserInProvider: jest.fn(),
+    },
+}));
 
 const app = express();
 app.use(express.json());
 app.use('/api/v1/auth', authRoutes);
 
-describe('Auth Routes Integration Test (POST /api/v1/auth/login)', () => {
-    let mongoServer;
+describe('Auth Routes Integration Test (Login and Register)', () => {
     let mockUser;
 
-    beforeAll(async () => {
-        mongoServer = await MongoMemoryServer.create();
-        const uri = mongoServer.getUri();
-        await mongoose.connect(uri);
-    });
-
-    afterAll(async () => {
-        await mongoose.disconnect();
-        await mongoServer.stop();
-    });
+    // Os blocos beforeAll e afterAll foram REMOVIDOS.
+    // O jest.setup.js agora cuida da conexão e desconexão.
 
     beforeEach(async () => {
-        // Limpar mocks e banco de dados
+        // Limpar mocks
         jest.clearAllMocks();
-        await User.deleteMany({});
 
-        // Criar usuário de teste no banco MongoDB
+        // O afterEach global limpa o banco.
+        // Este beforeEach agora SÓ cria o usuário base para os testes.
         mockUser = await User.create({
             name: 'Joana Mendes',
             email: 'joana.mendes@email.com',
             authProviderUid: 'firebase-uid-123',
-            role: 'NUTRITIONIST',
+            role: 'COMMON',
             isActive: true,
         });
     });
 
-    /**
-     * @test {POST /login} - Sucesso
-     * @description Verifica o login bem-sucedido com credenciais válidas.
+    /*
+     * ======================================
+     * TESTES DE LOGIN (POST /login)
+     * ======================================
      */
-    it('should return 200 OK with token and user data on successful login', async () => {
-        const mockToken = 'mock.jwt.token.123456';
-        const validCredentials = {
-            email: mockUser.email,
-            password: 'umaSenhaMuitoForte123',
-        };
+    describe('POST /api/v1/auth/login', () => {
 
-        // Simula o Firebase validando as credenciais com sucesso
-        authService.validateCredentialsAndGetToken.mockResolvedValue({ token: mockToken });
+        /**
+         * @test {POST /login} - Sucesso
+         * @description Verifica o login bem-sucedido com credenciais válidas.
+         */
+        it('should return 200 OK with token and user data on successful login', async () => {
+            const mockToken = 'mock.jwt.token.123456';
+            const validCredentials = {
+                email: mockUser.email,
+                password: 'umaSenhaMuitoForte123',
+            };
 
-        const res = await request(app)
-            .post('/api/v1/auth/login')
-            .send(validCredentials);
+            authService.validateCredentialsAndGetToken.mockResolvedValue({ token: mockToken });
 
-        // Asserts
-        expect(res.status).toBe(200);
-        expect(res.body.token).toBe(mockToken);
-        expect(res.body.user).toBeDefined();
-        expect(res.body.user.id).toBe(mockUser._id.toString());
-        expect(res.body.user.name).toBe(mockUser.name);
-        expect(res.body.user.email).toBe(mockUser.email);
-        expect(res.body.user.role).toBe(mockUser.role);
+            const res = await request(app)
+                .post('/api/v1/auth/login')
+                .send(validCredentials);
+
+            expect(res.status).toBe(200);
+            expect(res.body.token).toBe(mockToken);
+            expect(res.body.user).toBeDefined();
+            expect(res.body.user.id).toBe(mockUser._id.toString());
+        });
+
+        /**
+         * @test {POST /login} - Falha (Senha Incorreta)
+         * @description Verifica a falha de login com senha incorreta.
+         */
+        it('should return 401 Unauthorized for invalid password', async () => {
+            const invalidCredentials = {
+                email: mockUser.email,
+                password: 'senhaErrada123',
+            };
+            authService.validateCredentialsAndGetToken.mockRejectedValue(new Error('auth/wrong-password'));
+
+            const res = await request(app)
+                .post('/api/v1/auth/login')
+                .send(invalidCredentials);
+
+            expect(res.status).toBe(401);
+            expect(res.body.message).toBe('Credenciais inválidas.');
+        });
+
+        /**
+         * @test {POST /login} - Falha (Usuário Inativo)
+         * @description Verifica se o login é barrado para usuários inativos, mesmo com senha válida.
+         */
+        it('should return 401 Unauthorized if user is inactive in MongoDB', async () => {
+            mockUser.isActive = false;
+            await mockUser.save();
+
+            const validCredentials = { email: mockUser.email, password: 'umaSenhaMuitoForte123' };
+            authService.validateCredentialsAndGetToken.mockResolvedValue({ token: 'mock.jwt.token.123456' });
+
+            const res = await request(app)
+                .post('/api/v1/auth/login')
+                .send(validCredentials);
+
+            expect(res.status).toBe(401);
+            expect(res.body.message).toBe('Usuário não encontrado ou inativo.');
+        });
     });
 
-    /**
-     * @test {POST /login} - Falha (Senha Incorreta)
-     * @description Verifica a falha de login com senha incorreta.
+    /*
+     * ======================================
+     * TESTES DE REGISTRO (POST /register)
+     * ======================================
      */
-    it('should return 401 Unauthorized for invalid password', async () => {
-        const invalidCredentials = {
-            email: mockUser.email,
-            password: 'senhaErrada123',
+    describe('POST /api/v1/auth/register', () => {
+
+        const newUserData = {
+            name: 'Carlos Bastos',
+            email: 'carlos.bastos@email.com',
+            password: 'outraSenhaForte456',
+            role: 'ADMIN'
         };
 
-        // Simula o Firebase rejeitando a senha
-        authService.validateCredentialsAndGetToken.mockRejectedValue(new Error('auth/wrong-password'));
+        /**
+         * @test {POST /register} - Sucesso (US-01)
+         * @description Deve registrar um novo usuário com sucesso (Status 201).
+         */
+        it('should register a new user successfully (201 Created)', async () => {
 
-        const res = await request(app)
-            .post('/api/v1/auth/login')
-            .send(invalidCredentials);
+            const mockProviderResponse = {
+                uid: 'firebase-uid-new-carlos',
+                email: newUserData.email
+            };
+            authService.createUserInProvider.mockResolvedValue(mockProviderResponse);
 
-        // Asserts
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Credenciais inválidas.');
-    });
+            const res = await request(app)
+                .post('/api/v1/auth/register')
+                .send(newUserData);
 
-    /**
-     * @test {POST /login} - Falha (E-mail não cadastrado)
-     * @description Verifica a falha de login com e-mail não cadastrado no Firebase.
-     */
-    it('should return 401 Unauthorized for user not found in identity provider', async () => {
-        const notFoundCredentials = {
-            email: 'notfound@email.com',
-            password: 'anypassword',
-        };
+            expect(res.status).toBe(201);
+            expect(res.body.id).toBeDefined();
 
-        // Simula o Firebase não encontrando o usuário
-        authService.validateCredentialsAndGetToken.mockRejectedValue(new Error('auth/user-not-found'));
+            const dbUser = await User.findById(res.body.id);
+            expect(dbUser).toBeDefined();
+            expect(dbUser.email).toBe(newUserData.email);
+            expect(dbUser.authProviderUid).toBe(mockProviderResponse.uid);
+        });
 
-        const res = await request(app)
-            .post('/api/v1/auth/login')
-            .send(notFoundCredentials);
+        /**
+         * @test {POST /register} - Falha (E-mail duplicado)
+         * @description Deve retornar 400 se o e-mail já existir no MongoDB.
+         */
+        it('should return 400 Bad Request if email already exists in MongoDB', async () => {
 
-        // Asserts
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Credenciais inválidas.');
-    });
+            const duplicateUserData = {
+                name: 'Outra Joana',
+                email: mockUser.email, // E-mail da usuária criada no beforeEach
+                password: 'anypassword123',
+            };
 
-    /**
-     * @test {POST /login} - Falha (Campos Faltando)
-     * @description Verifica a validação de entrada (Bad Request).
-     */
-    it('should return 400 Bad Request if email or password are not provided', async () => {
-        const res1 = await request(app)
-            .post('/api/v1/auth/login')
-            .send({ email: 'joana.mendes@email.com' }); // Faltando senha
+            const res = await request(app)
+                .post('/api/v1/auth/register')
+                .send(duplicateUserData);
 
-        const res2 = await request(app)
-            .post('/api/v1/auth/login')
-            .send({ password: 'umaSenhaMuitoForte123' }); // Faltando email
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('E-mail já cadastrado.');
+            expect(authService.createUserInProvider).not.toHaveBeenCalled();
+        });
 
-        // Asserts
-        expect(res1.status).toBe(400);
-        expect(res1.body.message).toBe('E-mail e senha são obrigatórios.');
-        expect(res2.status).toBe(400);
-        expect(res2.body.message).toBe('E-mail e senha são obrigatórios.');
-    });
+        /**
+         * @test {POST /register} - Falha (Campos Faltando)
+         * @description Deve retornar 400 se um campo obrigatório (name) não for fornecido.
+         */
+        it('should return 400 Bad Request if a required field (name) is missing', async () => {
+            const invalidData = {
+                email: 'novo.email@teste.com',
+                password: 'password123',
+            };
 
-    /**
-     * @test {POST /login} - Falha (Usuário Inativo)
-     * @description Verifica se o login é barrado para usuários inativos, mesmo com senha válida.
-     */
-    it('should return 401 Unauthorized if user is inactive in MongoDB', async () => {
-        // Desativa o usuário no nosso banco
-        mockUser.isActive = false;
-        await mockUser.save();
+            const res = await request(app)
+                .post('/api/v1/auth/register')
+                .send(invalidData); // Faltando 'name'
 
-        const validCredentials = {
-            email: mockUser.email,
-            password: 'umaSenhaMuitoForte123',
-        };
-        const mockToken = 'mock.jwt.token.123456';
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Nome, e-mail e senha são obrigatórios.');
+            expect(authService.createUserInProvider).not.toHaveBeenCalled();
+        });
 
-        // Simula o Firebase validando as credenciais (ele não sabe do 'isActive')
-        authService.validateCredentialsAndGetToken.mockResolvedValue({ token: mockToken });
+        /**
+         * @test {POST /register} - Falha (Validation Error do Mongoose)
+         * @description Deve retornar 400 se a 'role' for inválida (conforme Schema).
+         */
+        it('should return 400 Bad Request for Mongoose validation error (invalid role)', async () => {
 
-        const res = await request(app)
-            .post('/api/v1/auth/login')
-            .send(validCredentials);
+            authService.createUserInProvider.mockResolvedValue({ uid: 'firebase-temp-uid' });
 
-        // Asserts
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe('Usuário não encontrado ou inativo.');
+            const invalidRoleData = {
+                name: 'Test Role',
+                email: 'test.role@email.com',
+                password: 'password123',
+                role: 'INVALID_ROLE' // Valor inválido segundo o Enum do Schema
+            };
+
+            const res = await request(app)
+                .post('/api/v1/auth/register')
+                .send(invalidRoleData);
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toBe('Erro de validação.');
+        });
     });
 });

@@ -13,7 +13,7 @@ import mongoose from 'mongoose';
  * @property {String} name - Nome do usuário. Campo obrigatório.
  * @property {String} email - Endereço de e-mail do usuário. Único, obrigatório e armazenado em minúsculas.
  * @property {String} authProviderUid - ID único do provedor de autenticação (ex: Firebase UID). Campo obrigatório e indexado.
- * @property {String} role - Função do usuário no sistema. Pode ser 'NUTRITIONIST' ou 'ADMIN'. O padrão é 'NUTRITIONIST'.
+ * @property {String} role - Função do usuário no sistema. Pode ser 'COMMON' ou 'ADMIN'. O padrão é 'COMMON'.
  * @property {Boolean} isActive - Status do usuário. Indica se o usuário está ativo ou não. O padrão é 'true'.
  * @property {Date} createdAt - Timestamp da criação do documento. Gerado automaticamente.
  * @property {Date} updatedAt - Timestamp da última atualização do documento. Gerado automaticamente.
@@ -42,10 +42,10 @@ const UserSchema = new mongoose.Schema(
             type: String,
             required: true,
             enum: {
-                values: ['NUTRITIONIST', 'ADMIN'],
+                values: ['COMMON', 'ADMIN'],
                 message: '{VALUE} não é uma função válida.',
             },
-            default: 'NUTRITIONIST',
+            default: 'COMMON',
         },
         isActive: {
             type: Boolean,

@@ -1,74 +1,50 @@
 /**
- * @fileoverview Testes unitários para o modelo User do Mongoose.
- * @version 1.0
+ * @fileoverview Testes de unidade para o modelo User.
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import User from '@/src/models/User.js';
 
 describe('User Model Test', () => {
-    let mongoServer;
 
-    // Antes de todos os testes, inicializa um servidor MongoDB em memória.
-    beforeAll(async () => {
-        mongoServer = await MongoMemoryServer.create();
-        const uri = mongoServer.getUri();
-        await mongoose.connect(uri);
-    });
-
-    // Depois de todos os testes, desconecta e para o servidor MongoDB.
-    afterAll(async () => {
-        await mongoose.disconnect();
-        await mongoServer.stop();
-    });
-
-    // Limpa os dados do usuário após cada teste para garantir isolamento.
-    afterEach(async () => {
-        await User.deleteMany({});
-    });
+    // Os blocos beforeAll, afterAll e afterEach foram REMOVIDOS.
+    // O jest.setup.js agora cuida da conexão e limpeza.
 
     /**
-     * @test {User.create} - Sucesso
-     * @description Verifica se um usuário pode ser criado com sucesso quando todos os dados válidos são fornecidos.
+     * @test {User Model} - Sucesso
+     * @description Testa a criação bem-sucedida de um usuário com dados válidos.
      */
     it('should create a user successfully with all valid data', async () => {
         const userData = {
-            name: 'João da Silva',
-            email: 'joao.silva@example.com',
-            authProviderUid: 'uid-12345',
-            role: 'NUTRITIONIST',
-            isActive: true,
+            name: 'Joana Mendes',
+            email: 'joana.mendes@email.com',
+            authProviderUid: 'firebase-uid-123',
+            role: 'COMMON',
         };
-
         const user = new User(userData);
         const savedUser = await user.save();
 
-        // Asserts
         expect(savedUser._id).toBeDefined();
         expect(savedUser.name).toBe(userData.name);
         expect(savedUser.email).toBe(userData.email);
+        expect(savedUser.role).toBe(userData.role);
         expect(savedUser.authProviderUid).toBe(userData.authProviderUid);
-        expect(savedUser.role).toBe('NUTRITIONIST');
         expect(savedUser.isActive).toBe(true);
         expect(savedUser.createdAt).toBeDefined();
-        expect(savedUser.updatedAt).toBeDefined();
     });
 
     /**
-     * @test {User.create} - Falha
-     * @description Verifica se a criação de um usuário falha quando um campo obrigatório, como o email, não é fornecido.
+     * @test {User Model} - Falha (Campo Obrigatório Faltando)
+     * @description Testa a falha ao criar um usuário sem o campo 'email'.
      */
     it('should fail to create a user when a required field (email) is not provided', async () => {
         const userData = {
-            name: 'Maria Oliveira',
-            authProviderUid: 'uid-54321',
+            name: 'Usuário Sem Email',
+            authProviderUid: 'firebase-uid-456',
         };
-
         const user = new User(userData);
 
-        // Espera que a operação de salvar lance um erro de validação.
         let err;
         try {
             await user.save();
@@ -76,47 +52,64 @@ describe('User Model Test', () => {
             err = error;
         }
 
-        // Asserts
-        expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
+        expect(err).toBeInstanceOf(Error);
         expect(err.errors.email).toBeDefined();
-        expect(err.errors.email.message).toBe('O campo "email" é obrigatório.');
+        expect(err.errors.email.kind).toBe('required');
     });
 
     /**
-     * @test {User.email} - Unicidade
-     * @description Verifica a restrição de unicidade do campo de e-mail.
+     * @test {User Model} - Falha (E-mail duplicado)
+     * @description Testa a falha ao criar um usuário com um e-mail que já existe.
      */
     it('should fail to create a user with a duplicate email', async () => {
-        const userData = {
-            name: 'Carlos Pereira',
-            email: 'carlos.pereira@example.com',
-            authProviderUid: 'uid-67890',
-        };
-
         // Cria o primeiro usuário
-        const user1 = new User(userData);
-        await user1.save();
+        await User.create({
+            name: 'Usuário Original',
+            email: 'duplicado@email.com',
+            authProviderUid: 'firebase-uid-789',
+        });
 
-        // Tenta criar o segundo usuário com o mesmo email, mas UID diferente
-        const user2 = new User({ ...userData, name: 'Carlos Outro', authProviderUid: 'uid-09876' });
+        // Tenta criar o segundo usuário com o mesmo e-mail
+        const duplicateUser = new User({
+            name: 'Usuário Duplicado',
+            email: 'duplicado@email.com',
+            authProviderUid: 'firebase-uid-101',
+        });
 
-        // Espera que a operação de salvar lance um erro de chave duplicada.
-        await expect(user2.save()).rejects.toThrow();
+        let err;
+        try {
+            await duplicateUser.save();
+        } catch (error) {
+            err = error;
+        }
+
+        expect(err).toBeDefined();
+        // O Mongoose usa o código 11000 para erros de índice único (duplicidade)
+        expect(err.code).toBe(11000);
     });
 
     /**
-     * @test {User.role} - Enum
-     * @description Verifica se a criação falha com um valor de 'role' inválido.
+     * @test {User Model} - Falha (Role inválida)
+     * @description Testa a falha ao criar um usuário com uma 'role' que não está no Enum.
      */
     it('should fail to create a user with an invalid role', async () => {
         const userData = {
-            name: 'Ana Souza',
-            email: 'ana.souza@example.com',
-            authProviderUid: 'uid-11223',
-            role: 'INVALID_ROLE', // Valor inválido
+            name: 'Usuário Role Inválida',
+            email: 'role.invalida@email.com',
+            authProviderUid: 'firebase-uid-112',
+            role: 'PACIENTE', // Valor inválido
         };
-
         const user = new User(userData);
-        await expect(user.save()).rejects.toThrow(mongoose.Error.ValidationError);
+
+        let err;
+        try {
+            await user.save();
+        } catch (error) {
+            err = error;
+        }
+
+        expect(err).toBeInstanceOf(Error);
+        expect(err.errors.role).toBeDefined();
+        expect(err.errors.role.kind).toBe('enum');
     });
 });

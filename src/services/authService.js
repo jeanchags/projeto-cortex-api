@@ -1,12 +1,12 @@
 /**
- * @fileoverview Serviço de autenticação para interagir com o provedor de identidade.
- * @version 1.0
- * @author Jean Chagas Fernandes - Studio Fixk
+ * @fileoverview Serviço de autenticação para interagir com o provedor de identidade (simulado).
+ * @version 1.1
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
-// Em um ambiente real, importaríamos o SDK do Firebase/Identity Platform aqui.
-// Ex: import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-// const auth = getAuth(firebaseApp);
+// Em um ambiente real, importaríamos o Firebase Admin SDK aqui.
+// Ex: import admin from 'firebase-admin';
+// admin.initializeApp({ credential: admin.credential.applicationDefault() });
 
 /**
  * Valida as credenciais do usuário (email e senha) contra o provedor de identidade
@@ -18,20 +18,8 @@
  * @throws {Error} Lança um erro se as credenciais forem inválidas (ex: 'auth/wrong-password').
  */
 const validateCredentialsAndGetToken = async (email, password) => {
-    // --- SIMULAÇÃO DA LÓGICA DO FIREBASE ---
-    // Esta função está mocada nos testes. Em produção, conteria a chamada real:
-    //
-    // try {
-    //   const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    //   const token = await userCredential.user.getIdToken();
-    //   return { token };
-    // } catch (error) {
-    //   // error.code (ex: 'auth/wrong-password', 'auth/user-not-found')
-    //   throw new Error('Credenciais inválidas.');
-    // }
-    //
-    // Como não podemos executar o SDK aqui, lançamos um erro se a senha não for
-    // "umaSenhaMuitoForte123" (para fins de simulação de falha).
+    // --- SIMULAÇÃO DA LÓGICA DO FIREBASE (LOGIN) ---
+    // Esta função está mocada nos testes.
 
     if (password === 'umaSenhaMuitoForte123') {
         // Simula um token JWT retornado pelo Firebase
@@ -43,6 +31,37 @@ const validateCredentialsAndGetToken = async (email, password) => {
     }
 };
 
+/**
+ * (SIMULAÇÃO) Cria um novo usuário no provedor de identidade (Firebase Admin SDK).
+ * Em um cenário real: await admin.auth().createUser({ email, password });
+ *
+ * @param {string} email O e-mail do usuário.
+ * @param {string} password A senha do usuário.
+ * @returns {Promise<{uid: string, email: string}>} Uma promessa que resolve com o registro do usuário do provedor.
+ * @throws {Error} Lança um erro se o provedor falhar (ex: 'auth/email-already-exists').
+ */
+const createUserInProvider = async (email, password) => {
+    // --- SIMULAÇÃO DA CRIAÇÃO NO FIREBASE ---
+    // O Firebase Admin SDK também validaria o formato do e-mail e a força da senha.
+    if (!email || !password) {
+        throw new Error('Email e senha são necessários para o provedor.');
+    }
+
+    // O Firebase lançaria este erro se o e-mail já existisse *lá*.
+    // Nossa aplicação (controller) já deve ter verificado no *MongoDB* primeiro.
+    if (email === 'firebase.duplicate@email.com') {
+        throw new Error('auth/email-already-exists');
+    }
+
+    // Simula um registro de usuário bem-sucedido do Firebase
+    return {
+        uid: `firebase-uid-${Date.now()}`,
+        email: email,
+    };
+};
+
+
 export const authService = {
     validateCredentialsAndGetToken,
+    createUserInProvider, // Exportando a nova função
 };

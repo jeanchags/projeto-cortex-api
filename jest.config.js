@@ -1,6 +1,6 @@
 /**
  * @fileoverview Configuração do Jest para o ambiente de testes.
- * @version 1.1
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 export default {
@@ -27,5 +27,5 @@ export default {
     },
 
     // Arquivo de setup para os testes
-    setupFilesAfterEnv: ['./tests/setup.js'],
+    setupFilesAfterEnv: ['./jest.setup.js'],
 };

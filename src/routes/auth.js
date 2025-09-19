@@ -1,12 +1,11 @@
 /**
  * @fileoverview Define as rotas para o módulo de Autenticação.
- * @version 1.0
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import { Router } from 'express';
-import { login } from '@/src/controllers/authController.js';
-// Importaremos o 'register' aqui quando a BE-01 for concluída.
+import { login, register } from '@/src/controllers/authController.js'; // Importa o register
 
 const router = Router();
 
@@ -16,7 +15,8 @@ const router = Router();
 router.post('/login', login);
 
 // @route   POST /api/v1/auth/register
-// @desc    Registra um novo usuário (Tarefa BE-01)
-// router.post('/register', register);
+// @desc    Registra um novo usuário (Tarefa BE-02 / US-01)
+// @access  Público
+router.post('/register', register);
 
 export default router;
