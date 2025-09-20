@@ -5,11 +5,14 @@
  */
 
 import express from 'express';
-import authRoutes from './routes/auth.js';
+import morgan from 'morgan';
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 
 // Middleware para parsear JSON
+app.use(express.json());
+app.use(morgan('dev')); // <-- 2. Use o morgan em modo 'dev' para logs coloridos
 app.use(express.json());
 
 // Rotas da API

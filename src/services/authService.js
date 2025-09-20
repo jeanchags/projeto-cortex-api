@@ -14,13 +14,11 @@ import User from '../models/User.js';
  * @returns {Promise<{newUser: object, token: string}>} O novo usuário e o token.
  */
 export const registerUser = async ({ name, email, password }) => {
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
         name,
         email,
-        password: hashedPassword,
+        password: password,
     });
 
     await newUser.save();
