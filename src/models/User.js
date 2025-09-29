@@ -72,8 +72,8 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: {
-            values: ['ADMIN', 'COMMON'], // Conforme arquitetura  (e spec [cite: 237] que usa 'NUTRITIONIST', mas o enum atual só tem ADMIN/COMMON)
-            message: '{VALUE} não é uma função válida.',
+            values: ['ADMIN', 'COMMON'], // Conforme arquitetura  (e spec [cite: 237] que usa 'COMMON', mas o enum atual só tem ADMIN/COMMON)
+            message: 'A função `{VALUE}` não é válida.',
         },
         default: 'COMMON',
     },

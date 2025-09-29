@@ -1,6 +1,6 @@
 /**
  * @fileoverview Arquivo principal de configuração do aplicativo Express.
- * @version 1.0
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
@@ -12,8 +12,7 @@ const app = express();
 
 // Middleware para parsear JSON
 app.use(express.json());
-app.use(morgan('dev')); // <-- 2. Use o morgan em modo 'dev' para logs coloridos
-app.use(express.json());
+app.use(morgan('dev'));
 
 // Rotas da API
 app.use('/api/v1/auth', authRoutes);

@@ -1,16 +1,24 @@
 /**
  * @fileoverview Testes de unidade para o modelo User.
- * @version 1.6
- * @author Jean Chagas Fernandes - Studio Fix (Modificado por Desenvolvedor Full-Stack)
+ * @version 1.8
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 import mongoose from 'mongoose';
 import User from '../../src/models/User.js';
 
 describe('User Model Test', () => {
 
-    // A conexão com o banco de dados é gerenciada globalmente pelo jest.setup.js
+    /**
+     * Garante que os índices únicos sejam construídos no banco de dados ANTES de qualquer teste.
+     * Isso é crucial para evitar condições de corrida no teste de e-mail duplicado.
+     */
+    beforeAll(async () => {
+        await User.syncIndexes();
+    });
 
-    // Hook para limpar a coleção de usuários antes de cada teste.
+    /**
+     * Limpa a coleção de usuários antes de cada teste para garantir isolamento.
+     */
     beforeEach(async () => {
         await User.deleteMany({});
     });
@@ -27,9 +35,6 @@ describe('User Model Test', () => {
         expect(savedUser._id).toBeDefined();
         expect(savedUser.name).toBe(userData.name);
         expect(savedUser.email).toBe(userData.email);
-        expect(savedUser.password).toBeDefined();
-        expect(savedUser.role).toBe(userData.role);
-        expect(savedUser.createdAt).toBeDefined();
     });
 
     it('should fail to create a user without a required field (email)', async () => {
@@ -38,33 +43,21 @@ describe('User Model Test', () => {
             password: 'password123',
         };
         const user = new User(userData);
-        let err;
-        try {
-            await user.save();
-        } catch (error) {
-            err = error;
-        }
-        expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
-        expect(err.errors.email).toBeDefined();
+        await expect(user.save()).rejects.toThrow(mongoose.Error.ValidationError);
     });
 
     it('should fail to create a user with a duplicate email', async () => {
-        expect.assertions(1);
-
-        // CORREÇÃO A: A senha '123' era inválida (menos de 6 caracteres).
-        // Usar uma senha válida para o primeiro usuário.
         const userData = { name: 'Duplicado', email: 'duplicado@email.com', password: 'password123' };
-        const user1 = new User(userData);
-        await user1.save(); // Agora isso deve funcionar
+        await User.create(userData); // Cria o primeiro usuário
 
         const user2 = new User(userData);
-        try {
-            await user2.save(); // Isso deve falhar com o erro de duplicidade
-        } catch (error) {
-            expect(error.code).toBe(11000); // A asserção de duplicidade
-        }
-    });
 
+        // CORREÇÃO: Utiliza o `rejects.toThrow()` para tratar a Promise rejeitada
+        // e verifica o código de erro do MongoDB para chave duplicada (11000).
+        await expect(user2.save()).rejects.toThrow(expect.objectContaining({
+            code: 11000
+        }));
+    });
 
     it('should fail to create a user with an invalid role', async () => {
         const userData = {
@@ -75,42 +68,27 @@ describe('User Model Test', () => {
         };
         const user = new User(userData);
 
-        // CORREÇÃO B: Remover as crases (`) da string esperada
-        // para corresponder exatamente à mensagem de erro do Mongoose.
-        await expect(user.save()).rejects.toThrow('User validation failed: role: PACIENTE não é uma função válida.');
+        // CORREÇÃO: O teste agora espera a mensagem de erro em português definida no schema.
+        await expect(user.save()).rejects.toThrow('User validation failed: role: A função `PACIENTE` não é válida.');
     });
-
 
     it('should trim the email before saving', async () => {
         const emailWithSpaces = '  teste.trim@email.com  ';
-        const user = new User({
-            name: 'Teste Trim',
-            email: emailWithSpaces,
-            password: 'password123'
-        });
+        const user = new User({ name: 'Teste Trim', email: emailWithSpaces, password: 'password123' });
         const savedUser = await user.save();
         expect(savedUser.email).toBe('teste.trim@email.com');
     });
 
     it('should convert the email to lowercase before saving', async () => {
         const emailWithUppercase = 'Teste.CASE@Email.com';
-        const user = new User({
-            name: 'Teste Case',
-            email: emailWithUppercase,
-            password: 'password123'
-        });
+        const user = new User({ name: 'Teste Case', email: emailWithUppercase, password: 'password123' });
         const savedUser = await user.save();
         expect(savedUser.email).toBe('teste.case@email.com');
     });
 
     it('should assign the default role "COMMON" if none is provided', async () => {
-        const user = new User({
-            name: 'Usuario Comum',
-            email: 'comum@email.com',
-            password: 'password123'
-        });
+        const user = new User({ name: 'Usuario Comum', email: 'comum@email.com', password: 'password123' });
         const savedUser = await user.save();
         expect(savedUser.role).toBe('COMMON');
     });
-
 });

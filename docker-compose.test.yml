@@ -1,0 +1,32 @@
+# docker-compose.test.yml
+version: '3.8'
+
+services:
+  # Container do MongoDB exclusivo para testes
+  mongo-test:
+    image: mongo:latest
+    container_name: projeto-cortex-mongo-test
+    ports:
+      - '27018:27017' # Mapeia para uma porta diferente para não conflitar com o dev
+    command: mongod --quiet --logpath /dev/null # Inicia em modo silencioso
+
+  # Container da API, configurado para rodar os testes
+  api-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projeto-cortex-api-test
+    # A API depende que o banco de dados esteja pronto
+    depends_on:
+      - mongo-test
+    # Sobrescreve o CMD do Dockerfile para executar os testes
+    command: npm test
+    environment:
+      # Passa a URI de conexão para o container da API
+      - MONGODB_URI_TEST=mongodb://mongo-test:27017/cortexdb-test
+      # As variáveis de JWT ainda são necessárias para os testes de autenticação
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+    # Carrega as variáveis do seu arquivo .env local
+    env_file:
+      - .env
