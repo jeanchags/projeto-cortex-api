@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Rotas para o recurso de autenticação (auth).
+ * @version 2.0
+ * @author Jean Chagas Fernandes - Studio Fix
+ */
 import express from 'express';
 import { check } from 'express-validator';
 import { register, login } from '../controllers/authController.js';
