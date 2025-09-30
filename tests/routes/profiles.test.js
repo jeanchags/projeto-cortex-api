@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de integração para as rotas de Profile.
- * @version 1.0
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
@@ -10,18 +10,18 @@ import Profile from '../../src/models/Profile.js';
 import jwt from 'jsonwebtoken';
 
 describe('Profile Routes Integration Test', () => {
-    let testUser;
-    let token;
+    let userA;
+    let tokenA;
+    let userB;
+    let tokenB;
 
     beforeAll(async () => {
         await User.deleteMany({});
-        testUser = await new User({
-            name: 'Usuário de Teste para Perfil',
-            email: 'profileuser@test.com',
-            password: 'password123'
-        }).save();
+        userA = await new User({ name: 'Usuario A', email: 'usera@test.com', password: 'password123' }).save();
+        userB = await new User({ name: 'Usuario B', email: 'userb@test.com', password: 'password123' }).save();
 
-        token = jwt.sign({ user: { id: testUser.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        tokenA = jwt.sign({ user: { id: userA.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        tokenB = jwt.sign({ user: { id: userB.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
     });
 
     beforeEach(async () => {
@@ -32,7 +32,7 @@ describe('Profile Routes Integration Test', () => {
         it('should create a new profile for an authenticated user and return 201', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
-                .set('Authorization', `Bearer ${token}`)
+                .set('Authorization', `Bearer ${tokenA}`)
                 .send({
                     personalData: {
                         fullName: 'Cliente Válido'
@@ -42,7 +42,7 @@ describe('Profile Routes Integration Test', () => {
             expect(res.statusCode).toEqual(201);
             expect(res.body).toHaveProperty('_id');
             expect(res.body.personalData.fullName).toBe('Cliente Válido');
-            expect(res.body.managedBy).toBe(testUser.id);
+            expect(res.body.managedBy).toBe(userA.id);
         });
 
         it('should return 401 if no token is provided', async () => {
@@ -61,7 +61,7 @@ describe('Profile Routes Integration Test', () => {
         it('should return 400 if personalData.fullName is missing', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
-                .set('Authorization', `Bearer ${token}`)
+                .set('Authorization', `Bearer ${tokenA}`)
                 .send({
                     personalData: {} // fullName ausente
                 });
@@ -82,6 +82,76 @@ describe('Profile Routes Integration Test', () => {
 
             expect(res.statusCode).toEqual(401);
             expect(res.body.message).toBe('Token inválido.');
+        });
+    });
+
+    describe('GET /api/v1/profiles', () => {
+        it('should return 200 and a list of profiles for an authenticated user', async () => {
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 1 de A' } }).save();
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 2 de A' } }).save();
+
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body).toHaveProperty('profiles');
+            expect(res.body).toHaveProperty('pagination');
+            expect(res.body.profiles.length).toBe(2);
+            expect(res.body.profiles[0].fullName).toBe('Cliente 1 de A');
+            expect(res.body.pagination.totalItems).toBe(2);
+        });
+
+        it('should return 200 and an empty list if the user has no profiles', async () => {
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body.profiles).toEqual([]);
+            expect(res.body.pagination.totalItems).toBe(0);
+        });
+
+        it('should return 401 if no token is provided', async () => {
+            const res = await request(app).get('/api/v1/profiles');
+
+            expect(res.statusCode).toEqual(401);
+            expect(res.body.message).toBe('Acesso negado. Nenhum token fornecido ou token mal formatado.');
+        });
+
+        it('should ensure data isolation between users', async () => {
+            // Cria um perfil para o usuário B
+            await new Profile({ managedBy: userB._id, personalData: { fullName: 'Cliente de B' } }).save();
+
+            // Faz a requisição como usuário A
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            // Espera que a lista de perfis do usuário A esteja vazia
+            expect(res.statusCode).toEqual(200);
+            expect(res.body.profiles).toEqual([]);
+            expect(res.body.pagination.totalItems).toBe(0);
+        });
+
+        it('should handle pagination correctly', async () => {
+            // Cria 15 perfis para o usuário A
+            for (let i = 1; i <= 15; i++) {
+                await new Profile({ managedBy: userA._id, personalData: { fullName: `Cliente ${i}` } }).save();
+            }
+
+            // Busca a segunda página com limite de 5
+            const res = await request(app)
+                .get('/api/v1/profiles?page=2&limit=5')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            expect(res.body.profiles.length).toBe(5);
+            expect(res.body.pagination.currentPage).toBe(2);
+            expect(res.body.pagination.totalPages).toBe(3);
+            expect(res.body.pagination.totalItems).toBe(15);
+            // O primeiro item da segunda página deve ser o cliente 6 (assumindo ordenação padrão)
+            expect(res.body.profiles[0].fullName).toContain('Cliente 6');
         });
     });
 });

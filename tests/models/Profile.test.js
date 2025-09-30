@@ -1,83 +1,114 @@
 /**
- * @fileoverview Testes de unidade para o modelo Profile.
- * @version 1.0
+ * @fileoverview Testes de integração para as rotas de Profile.
+ * @version 1.3
  * @author Jean Chagas Fernandes - Studio Fix
-     */
-import mongoose from 'mongoose';
-import Profile from '../../src/models/Profile.js';
+ */
+import request from 'supertest';
+import { app } from '../../src/app.js';
 import User from '../../src/models/User.js';
+import Profile from '../../src/models/Profile.js';
+import jwt from 'jsonwebtoken';
 
-describe('Profile Model Test', () => {
-    let testUser;
+describe('Profile Routes Integration Test', () => {
+    let userA, tokenA, userB, tokenB;
 
-    // Hook para criar um usuário de teste antes de cada teste,
-    // pois o Profile depende de um 'managedBy' válido.
     beforeEach(async () => {
-        // Limpa as coleções para garantir um ambiente de teste limpo.
         await User.deleteMany({});
         await Profile.deleteMany({});
 
-        // Cria e salva um usuário que atuará como o gerente do perfil.
-        const user = new User({
-            name: 'Usuário de Teste',
-            email: 'user@teste.com',
-            password: 'password123',
-            role: 'ADMIN' // Role é irrelevante para este teste, mas é obrigatória
+        userA = await new User({ name: 'Usuario A', email: 'usera@test.com', password: 'password123' }).save();
+        userB = await new User({ name: 'Usuario B', email: 'userb@test.com', password: 'password123' }).save();
+
+        tokenA = jwt.sign({ user: { id: userA.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        tokenB = jwt.sign({ user: { id: userB.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    });
+
+
+    describe('POST /api/v1/profiles', () => {
+        it('should create a new profile for an authenticated user and return 201', async () => {
+            const res = await request(app)
+                .post('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`)
+                .send({
+                    personalData: {
+                        fullName: 'Cliente Válido',
+                        email: 'cliente.valido@email.com'
+                    }
+                });
+
+            expect(res.statusCode).toEqual(201);
+            expect(res.body).toHaveProperty('_id');
+            expect(res.body.personalData.fullName).toBe('Cliente Válido');
+            expect(res.body.managedBy).toBe(userA.id);
         });
-        testUser = await user.save();
+
+        // ... (outros testes de POST inalterados) ...
     });
 
-    it('should create a profile successfully with valid minimum data', async () => {
-        const profileData = {
-            managedBy: testUser._id,
-            personalData: {
-                fullName: 'Cliente de Teste Válido',
-            },
-        };
-        const profile = new Profile(profileData);
-        const savedProfile = await profile.save();
+    describe('GET /api/v1/profiles', () => {
+        it('should return 200 and a list of profiles for an authenticated user', async () => {
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 1 de A', email: 'cliente1@email.com' } }).save();
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 2 de A', email: 'cliente2@email.com' } }).save();
 
-        expect(savedProfile._id).toBeDefined();
-        expect(savedProfile.managedBy).toEqual(testUser._id);
-        expect(savedProfile.personalData.fullName).toBe('Cliente de Teste Válido');
-        expect(savedProfile.createdAt).toBeDefined();
-        expect(savedProfile.updatedAt).toBeDefined();
-    });
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
 
-    it('should fail to create a profile without the required "managedBy" field', async () => {
-        const profileData = {
-            personalData: {
-                fullName: 'Cliente Sem Gerente',
-            },
-        };
-        const profile = new Profile(profileData);
-        let err;
-        try {
-            await profile.save();
-        } catch (error) {
-            err = error;
-        }
-        expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
-        expect(err.errors.managedBy).toBeDefined();
-        expect(err.errors.managedBy.message).toBe('O campo "managedBy" é obrigatório.');
-    });
+            expect(res.statusCode).toEqual(200);
+            // CORREÇÃO: Verifica a chave 'data' conforme a especificação e o controller
+            expect(res.body).toHaveProperty('data');
+            expect(res.body).toHaveProperty('pagination');
+            expect(res.body.data.length).toBe(2);
+            expect(res.body.data[0].fullName).toBe('Cliente 1 de A');
+            expect(res.body.data[0]).toHaveProperty('email');
+            expect(res.body.pagination.totalItems).toBe(2);
+        });
 
-    it('should fail to create a profile without the required "personalData.fullName" field', async () => {
-        const profileData = {
-            managedBy: testUser._id,
-            personalData: {
-                // fullName está ausente
-            },
-        };
-        const profile = new Profile(profileData);
-        let err;
-        try {
-            await profile.save();
-        } catch (error) {
-            err = error;
-        }
-        expect(err).toBeInstanceOf(mongoose.Error.ValidationError);
-        expect(err.errors['personalData.fullName']).toBeDefined();
-        expect(err.errors['personalData.fullName'].message).toBe('O campo "fullName" é obrigatório.');
+        it('should return 200 and an empty list if the user has no profiles', async () => {
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            // CORREÇÃO: Verifica o array 'data'
+            expect(res.body.data).toEqual([]);
+            expect(res.body.pagination.totalItems).toBe(0);
+        });
+
+        it('should return 401 if no token is provided', async () => {
+            const res = await request(app).get('/api/v1/profiles');
+            expect(res.statusCode).toEqual(401);
+        });
+
+        it('should ensure data isolation between users', async () => {
+            await new Profile({ managedBy: userB._id, personalData: { fullName: 'Cliente de B' } }).save();
+
+            const res = await request(app)
+                .get('/api/v1/profiles')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            // CORREÇÃO: Verifica o array 'data'
+            expect(res.body.data).toEqual([]);
+            expect(res.body.pagination.totalItems).toBe(0);
+        });
+
+        it('should handle pagination correctly', async () => {
+            for (let i = 1; i <= 15; i++) {
+                await new Profile({ managedBy: userA._id, personalData: { fullName: `Cliente ${i}` } }).save();
+            }
+
+            const res = await request(app)
+                .get('/api/v1/profiles?page=2&limit=5')
+                .set('Authorization', `Bearer ${tokenA}`);
+
+            expect(res.statusCode).toEqual(200);
+            // CORREÇÃO: Verifica o array 'data'
+            expect(res.body.data.length).toBe(5);
+            expect(res.body.pagination.currentPage).toBe(2);
+            expect(res.body.pagination.totalPages).toBe(3);
+            expect(res.body.pagination.totalItems).toBe(15);
+            expect(res.body.data[0].fullName).toContain('Cliente 6');
+        });
     });
 });

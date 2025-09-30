@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de unidade para o modelo User.
- * @version 2.0
+ * @version 2.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import mongoose from 'mongoose';
@@ -8,16 +8,9 @@ import User from '../../src/models/User.js';
 
 describe('User Model Test', () => {
 
-    /**
-     * Garante que os índices únicos sejam construídos no banco de dados ANTES de qualquer teste.
-     * Usar createIndexes() é mais explícito e confiável em ambientes de teste.
-     */
     beforeAll(async () => {
         await User.createIndexes();
     });
-
-    // O hook beforeEach foi removido, pois a limpeza já é feita globalmente
-    // pelo arquivo jest.setup.js, garantindo um ambiente limpo para cada teste.
 
     it('should create a user successfully with all valid data', async () => {
         const userData = {
@@ -44,19 +37,12 @@ describe('User Model Test', () => {
         
         // 1. Cria o primeiro usuário com sucesso
         await User.create(userData);
-
-        // 2. Tenta criar o segundo usuário com o mesmo e-mail
+    
+        // 2. Tenta salvar um segundo usuário com o mesmo e-mail.
+        // CORREÇÃO: Usando a sintaxe `rejects.toThrow()` para um teste mais limpo e declarativo.
+        // O Jest irá garantir que a promessa é rejeitada, evitando a falha de "zero assertions".
         const user2 = new User(userData);
-
-        try {
-            await user2.save();
-            // Se o save() for bem-sucedido, o teste deve falhar intencionalmente.
-            fail('A criação do segundo usuário deveria ter falhado, mas foi bem-sucedida.');
-        } catch (error) {
-            // 3. Verifica se a mensagem de erro contém o padrão de chave duplicada do MongoDB.
-            // Esta é a forma mais robusta de verificar o erro de unicidade.
-            expect(error.message).toMatch(/E11000 duplicate key error/);
-        }
+        await expect(user2.save()).rejects.toThrow(/E11000 duplicate key error/);
     });
 
     it('should fail to create a user with an invalid role', async () => {
