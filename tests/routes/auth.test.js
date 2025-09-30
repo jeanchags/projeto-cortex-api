@@ -1,7 +1,7 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação.
  * @version 2.0
- * @author Jean Chagas Fernandes - Studio Fix (Modificado por Desenvolvedor Full-Stack)
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
 import mongoose from 'mongoose';

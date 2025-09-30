@@ -1,14 +1,13 @@
 /**
  * @fileoverview Configuração global do Jest.
  * Inicia um servidor MongoDB in-docker e carrega variáveis de ambiente.
- * @version 3.0
- * @author Jean Chagas Fernandes - Studio Fix (Modificado por Desenvolvedor Full-Stack)
+ * @version 3.1
+ * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
-// Carrega variáveis de ambiente (essencial para JWT_SECRET nos testes)
 dotenv.config({ path: '.env' });
 
 /**
@@ -18,33 +17,32 @@ dotenv.config({ path: '.env' });
 beforeAll(async () => {
     const mongoUri = process.env.MONGODB_URI_TEST;
 
-    if (!mongoUri) {
-        throw new Error('A variável de ambiente MONGODB_URI_TEST não foi definida.');
+    if (!mongoUri || !mongoUri.includes('test')) {
+        throw new Error('A variável de ambiente MONGODB_URI_TEST não foi definida ou não é de teste.');
     }
 
     await mongoose.connect(mongoUri);
 });
 
 /**
- * Hook que é executado DEPOIS de CADA teste em todas as suítes.
+ * Hook que executa ANTES de CADA teste em todas as suítes.
  * Limpa todas as coleções para garantir que os testes sejam perfeitamente isolados.
- * Mover a limpeza para afterEach é uma prática mais segura que beforeEach.
+ * Usar `beforeEach` para limpeza garante um estado limpo no início de cada teste.
  */
-afterEach(async () => {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-        const collection = collections[key];
-        await collection.deleteMany({});
-    }
+beforeEach(async () => {
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+      const collection = collections[key];
+      await collection.deleteMany({});
+  }
 });
 
 /**
  * Hook que é executado UMA VEZ após TODAS as suítes de teste.
  * Garante que o banco de dados de teste seja completamente apagado
- * e que a conexão seja encerrada, deixando o ambiente limpo para a próxima execução.
+ * e que a conexão seja encerrada.
  */
 afterAll(async () => {
-    // Apaga o banco de dados para garantir que os índices sejam recriados na próxima execução.
     await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });

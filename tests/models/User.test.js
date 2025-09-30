@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de unidade para o modelo User.
- * @version 1.8
+ * @version 2.0
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import mongoose from 'mongoose';
@@ -10,18 +10,14 @@ describe('User Model Test', () => {
 
     /**
      * Garante que os índices únicos sejam construídos no banco de dados ANTES de qualquer teste.
-     * Isso é crucial para evitar condições de corrida no teste de e-mail duplicado.
+     * Usar createIndexes() é mais explícito e confiável em ambientes de teste.
      */
     beforeAll(async () => {
-        await User.syncIndexes();
+        await User.createIndexes();
     });
 
-    /**
-     * Limpa a coleção de usuários antes de cada teste para garantir isolamento.
-     */
-    beforeEach(async () => {
-        await User.deleteMany({});
-    });
+    // O hook beforeEach foi removido, pois a limpeza já é feita globalmente
+    // pelo arquivo jest.setup.js, garantindo um ambiente limpo para cada teste.
 
     it('should create a user successfully with all valid data', async () => {
         const userData = {
@@ -38,25 +34,29 @@ describe('User Model Test', () => {
     });
 
     it('should fail to create a user without a required field (email)', async () => {
-        const userData = {
-            name: 'Maria Sem Email',
-            password: 'password123',
-        };
+        const userData = { name: 'Maria Sem Email', password: 'password123' };
         const user = new User(userData);
         await expect(user.save()).rejects.toThrow(mongoose.Error.ValidationError);
     });
 
     it('should fail to create a user with a duplicate email', async () => {
         const userData = { name: 'Duplicado', email: 'duplicado@email.com', password: 'password123' };
-        await User.create(userData); // Cria o primeiro usuário
+        
+        // 1. Cria o primeiro usuário com sucesso
+        await User.create(userData);
 
+        // 2. Tenta criar o segundo usuário com o mesmo e-mail
         const user2 = new User(userData);
 
-        // CORREÇÃO: Utiliza o `rejects.toThrow()` para tratar a Promise rejeitada
-        // e verifica o código de erro do MongoDB para chave duplicada (11000).
-        await expect(user2.save()).rejects.toThrow(expect.objectContaining({
-            code: 11000
-        }));
+        try {
+            await user2.save();
+            // Se o save() for bem-sucedido, o teste deve falhar intencionalmente.
+            fail('A criação do segundo usuário deveria ter falhado, mas foi bem-sucedida.');
+        } catch (error) {
+            // 3. Verifica se a mensagem de erro contém o padrão de chave duplicada do MongoDB.
+            // Esta é a forma mais robusta de verificar o erro de unicidade.
+            expect(error.message).toMatch(/E11000 duplicate key error/);
+        }
     });
 
     it('should fail to create a user with an invalid role', async () => {
@@ -67,8 +67,6 @@ describe('User Model Test', () => {
             role: 'PACIENTE'
         };
         const user = new User(userData);
-
-        // CORREÇÃO: O teste agora espera a mensagem de erro em português definida no schema.
         await expect(user.save()).rejects.toThrow('User validation failed: role: A função `PACIENTE` não é válida.');
     });
 
