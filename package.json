@@ -6,7 +6,7 @@
   "type": "module",
 "scripts": {
     "test": "jest",
-    "test:ci": "docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit"
+    "test:ci": "docker compose -f docker-compose.test.yml up --build --abort-on-container-exit"
   },
   "keywords": [],
   "author": "Jean Chagas Fernandes - Studio Fix",
