@@ -1,15 +1,17 @@
 /**
  * @fileoverview Controller para gerenciar submissões de formulários.
- * @version 1.0
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import { validationResult } from 'express-validator';
 import Submission from '../models/Submission.js';
 import Profile from '../models/Profile.js';
+import Report from '../models/Report.js'; // Importação do modelo Report
+import reportGenerationService from '../services/reportGenerationService.js'; // Importação do serviço
 
 /**
  * @function createSubmission
- * @description Cria uma nova submissão de formulário.
+ * @description Cria uma nova submissão de formulário e gera o relatório correspondente.
  * @param {object} req - O objeto de requisição do Express.
  * @param {object} res - O objeto de resposta do Express.
  */
@@ -41,6 +43,24 @@ export const createSubmission = async (req, res) => {
 
         await newSubmission.save();
 
+        // --- Início da Integração da Geração de Relatório (BE-13) ---
+
+        // 1. Invoca o serviço para gerar o conteúdo do relatório
+        const reportResult = reportGenerationService.generate(newSubmission);
+
+        // 2. Cria a nova instância do modelo Report
+        const newReport = new Report({
+            submissionId: newSubmission._id,
+            generatedBy: userId,
+            result: reportResult, // O resultado do serviço (content, score, summary)
+        });
+
+        // 3. Salva o relatório no banco de dados
+        await newReport.save();
+
+        // --- Fim da Integração ---
+
+        // A resposta para o cliente continua sendo a submissão criada.
         res.status(201).json(newSubmission);
 
     } catch (error) {

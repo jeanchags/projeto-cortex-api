@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de integração para as rotas de Submission.
- * @version 1.0
+ * @version 1.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
@@ -9,6 +9,7 @@ import User from '../../src/models/User.js';
 import Profile from '../../src/models/Profile.js';
 import Form from '../../src/models/Form.js';
 import Submission from '../../src/models/Submission.js';
+import Report from '../../src/models/Report.js'; // Importação do modelo Report
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
@@ -21,6 +22,7 @@ describe('POST /api/v1/submissions', () => {
         await Profile.deleteMany({});
         await Form.deleteMany({});
         await Submission.deleteMany({});
+        await Report.deleteMany({}); // Limpa a coleção de relatórios
 
         // Criação de usuários e tokens
         userA = await new User({ name: 'Usuario A', email: 'usera@submission.test.com', password: 'password123' }).save();
@@ -35,7 +37,7 @@ describe('POST /api/v1/submissions', () => {
         testForm = await new Form({ name: 'Form de Teste', version: '1.0.0', questions: [{ questionText: 'Q1', questionType: 'text' }] }).save();
     });
 
-    it('should return 201 and create a submission for an authenticated user on their own profile', async () => {
+    it('should return 201, create a submission, and automatically generate an associated report', async () => {
         const submissionData = {
             profileId: profileA._id.toString(),
             formVersion: testForm.version,
@@ -47,11 +49,23 @@ describe('POST /api/v1/submissions', () => {
             .set('Authorization', `Bearer ${tokenA}`)
             .send(submissionData);
 
+        // Validação da Submission (inalterado)
         expect(res.statusCode).toEqual(201);
         expect(res.body).toHaveProperty('_id');
+        const submissionId = res.body._id;
         expect(res.body.profileId).toBe(submissionData.profileId);
         expect(res.body.submittedBy).toBe(userA.id);
         expect(res.body.answers.q1).toBe('Resposta para Q1');
+
+        // --- Início da Validação do Relatório (BE-13) ---
+        const createdReport = await Report.findOne({ submissionId: submissionId });
+
+        expect(createdReport).not.toBeNull();
+        expect(createdReport.submissionId.toString()).toBe(submissionId);
+        expect(createdReport.generatedBy.toString()).toBe(userA.id);
+        expect(createdReport.result).toBeDefined();
+        expect(createdReport.result.score).toBe(10); // Conforme a lógica do service
+        // --- Fim da Validação do Relatório ---
     });
 
     it('should return 401 if no token is provided', async () => {
