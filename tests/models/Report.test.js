@@ -4,7 +4,7 @@
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import mongoose from 'mongoose';
-import Report from '../../src/models/Reports.js';
+import Report from '../../src/models/Report.js';
 
 describe('Report Model Test', () => {
     it('should create a report successfully with all valid data', async () => {

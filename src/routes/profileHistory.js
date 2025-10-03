@@ -8,7 +8,7 @@ import { app } from '../../src/app.js';
 import User from '../../src/models/User.js';
 import Profile from '../../src/models/Profile.js';
 import Submission from '../../src/models/Submission.js';
-import Report from '../../src/models/Reports.js';
+import Report from '../models/Report.js';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 

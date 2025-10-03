@@ -7,7 +7,7 @@
 import { validationResult } from 'express-validator';
 import Profile from '../models/Profile.js';
 import Submission from '../models/Submission.js';
-import Report from '../models/Reports.js';
+import Report from '../models/Report.js';
 import mongoose from 'mongoose';
 
 
