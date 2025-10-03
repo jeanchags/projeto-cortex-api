@@ -1,6 +1,6 @@
 /**
  * @fileoverview Arquivo principal de configuração do aplicativo Express.
- * @version 1.2
+ * @version 1.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
@@ -9,6 +9,7 @@ import morgan from 'morgan';
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/profiles.js";
 import formRoutes from "./routes/forms.js";
+import submissionRoutes from "./routes/submissions.js"; // Importação da nova rota
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(morgan('dev'));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
 app.use('/api/v1/forms', formRoutes);
+app.use('/api/v1/submissions', submissionRoutes); // Registro da nova rota
 
 // Exporta o app para ser usado nos testes e no index.js
 export { app };
