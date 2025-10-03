@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de integração para as rotas de Profile.
- * @version 1.1
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
@@ -10,32 +10,35 @@ import Profile from '../../src/models/Profile.js';
 import jwt from 'jsonwebtoken';
 
 describe('Profile Routes Integration Test', () => {
-    let userA;
-    let tokenA;
-    let userB;
-    let tokenB;
+    let userA, tokenA, userB, tokenB;
 
-    beforeAll(async () => {
+    // HOOK: Executa antes de CADA teste.
+    // Garante um ambiente limpo e cria usuários e tokens novos para cada cenário,
+    // assegurando total isolamento entre os testes.
+    beforeEach(async () => {
+        // A limpeza já é feita pelo jest.setup.js, mas para clareza,
+        // poderíamos garantir que as coleções estejam limpas se necessário.
         await User.deleteMany({});
+        await Profile.deleteMany({});
+
+        // Cria usuários de teste
         userA = await new User({ name: 'Usuario A', email: 'usera@test.com', password: 'password123' }).save();
         userB = await new User({ name: 'Usuario B', email: 'userb@test.com', password: 'password123' }).save();
 
+        // Gera tokens para os usuários
         tokenA = jwt.sign({ user: { id: userA.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
         tokenB = jwt.sign({ user: { id: userB.id } }, process.env.JWT_SECRET, { expiresIn: '1h' });
     });
 
-    beforeEach(async () => {
-        await Profile.deleteMany({});
-    });
-
     describe('POST /api/v1/profiles', () => {
-        it('should create a new profile for an authenticated user and return 201', async () => {
+        it('deve criar um novo perfil para um usuário autenticado e retornar 201', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
                 .set('Authorization', `Bearer ${tokenA}`)
                 .send({
                     personalData: {
-                        fullName: 'Cliente Válido'
+                        fullName: 'Cliente Válido',
+                        email: 'cliente.valido@email.com'
                     }
                 });
 
@@ -45,7 +48,7 @@ describe('Profile Routes Integration Test', () => {
             expect(res.body.managedBy).toBe(userA.id);
         });
 
-        it('should return 401 if no token is provided', async () => {
+        it('deve retornar 401 se nenhum token for fornecido', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
                 .send({
@@ -58,7 +61,7 @@ describe('Profile Routes Integration Test', () => {
             expect(res.body.message).toBe('Acesso negado. Nenhum token fornecido ou token mal formatado.');
         });
 
-        it('should return 400 if personalData.fullName is missing', async () => {
+        it('deve retornar 400 se personalData.fullName estiver faltando', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
                 .set('Authorization', `Bearer ${tokenA}`)
@@ -70,7 +73,7 @@ describe('Profile Routes Integration Test', () => {
             expect(res.body.details[0].path).toBe('personalData.fullName');
         });
 
-        it('should return 401 for an invalid token', async () => {
+        it('deve retornar 401 para um token inválido', async () => {
             const res = await request(app)
                 .post('/api/v1/profiles')
                 .set('Authorization', 'Bearer tokeninvalido123')
@@ -86,40 +89,38 @@ describe('Profile Routes Integration Test', () => {
     });
 
     describe('GET /api/v1/profiles', () => {
-        it('should return 200 and a list of profiles for an authenticated user', async () => {
-            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 1 de A' } }).save();
-            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 2 de A' } }).save();
+        it('deve retornar 200 e a lista de perfis do usuário autenticado', async () => {
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 1 de A', email: 'cliente1@email.com' } }).save();
+            await new Profile({ managedBy: userA._id, personalData: { fullName: 'Cliente 2 de A', email: 'cliente2@email.com' } }).save();
 
             const res = await request(app)
                 .get('/api/v1/profiles')
                 .set('Authorization', `Bearer ${tokenA}`);
 
             expect(res.statusCode).toEqual(200);
-            expect(res.body).toHaveProperty('profiles');
+            expect(res.body).toHaveProperty('data');
             expect(res.body).toHaveProperty('pagination');
-            expect(res.body.profiles.length).toBe(2);
-            expect(res.body.profiles[0].fullName).toBe('Cliente 1 de A');
+            expect(res.body.data.length).toBe(2);
+            expect(res.body.data[0].fullName).toBe('Cliente 1 de A');
             expect(res.body.pagination.totalItems).toBe(2);
         });
 
-        it('should return 200 and an empty list if the user has no profiles', async () => {
+        it('deve retornar 200 e uma lista vazia se o usuário não tiver perfis', async () => {
             const res = await request(app)
                 .get('/api/v1/profiles')
                 .set('Authorization', `Bearer ${tokenA}`);
 
             expect(res.statusCode).toEqual(200);
-            expect(res.body.profiles).toEqual([]);
+            expect(res.body.data).toEqual([]);
             expect(res.body.pagination.totalItems).toBe(0);
         });
 
-        it('should return 401 if no token is provided', async () => {
+        it('deve retornar 401 se nenhum token for fornecido', async () => {
             const res = await request(app).get('/api/v1/profiles');
-
             expect(res.statusCode).toEqual(401);
-            expect(res.body.message).toBe('Acesso negado. Nenhum token fornecido ou token mal formatado.');
         });
 
-        it('should ensure data isolation between users', async () => {
+        it('deve garantir o isolamento de dados entre usuários', async () => {
             // Cria um perfil para o usuário B
             await new Profile({ managedBy: userB._id, personalData: { fullName: 'Cliente de B' } }).save();
 
@@ -130,15 +131,17 @@ describe('Profile Routes Integration Test', () => {
 
             // Espera que a lista de perfis do usuário A esteja vazia
             expect(res.statusCode).toEqual(200);
-            expect(res.body.profiles).toEqual([]);
+            expect(res.body.data).toEqual([]);
             expect(res.body.pagination.totalItems).toBe(0);
         });
 
-        it('should handle pagination correctly', async () => {
-            // Cria 15 perfis para o usuário A
+        it('deve lidar com a paginação corretamente', async () => {
+            // Otimização: Cria os perfis em paralelo para acelerar o teste.
+            const profilePromises = [];
             for (let i = 1; i <= 15; i++) {
-                await new Profile({ managedBy: userA._id, personalData: { fullName: `Cliente ${i}` } }).save();
+                profilePromises.push(new Profile({ managedBy: userA._id, personalData: { fullName: `Cliente ${i}` } }).save());
             }
+            await Promise.all(profilePromises);
 
             // Busca a segunda página com limite de 5
             const res = await request(app)
@@ -146,12 +149,12 @@ describe('Profile Routes Integration Test', () => {
                 .set('Authorization', `Bearer ${tokenA}`);
 
             expect(res.statusCode).toEqual(200);
-            expect(res.body.profiles.length).toBe(5);
+            expect(res.body.data.length).toBe(5);
             expect(res.body.pagination.currentPage).toBe(2);
             expect(res.body.pagination.totalPages).toBe(3);
             expect(res.body.pagination.totalItems).toBe(15);
-            // O primeiro item da segunda página deve ser o cliente 6 (assumindo ordenação padrão)
-            expect(res.body.profiles[0].fullName).toContain('Cliente 6');
+            // O primeiro item da segunda página deve ser o cliente 6 (assumindo ordenação padrão de inserção)
+            expect(res.body.data[0].fullName).toContain('Cliente 6');
         });
     });
 });

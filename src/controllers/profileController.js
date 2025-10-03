@@ -58,7 +58,8 @@ export const getProfiles = async (req, res) => {
 
         const [profiles, totalItems] = await Promise.all([
             Profile.find({ managedBy: userId })
-                .select('personalData.fullName personalData.email updatedAt') // Adicionado personalData.email
+                .select('personalData.fullName personalData.email updatedAt')
+                .sort({ createdAt: 'asc' })
                 .skip(skip)
                 .limit(limit)
                 .lean(),
