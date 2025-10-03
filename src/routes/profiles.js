@@ -1,11 +1,11 @@
 /**
  * @fileoverview Rotas para o recurso de perfis (Profile).
- * @version 1.1
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import express from 'express';
 import { check } from 'express-validator';
-import { createProfile, getProfiles } from '../controllers/profileController.js';
+import { createProfile, getProfiles, getProfileHistory } from '../controllers/profileController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -29,6 +29,13 @@ router.post('/', protect, createProfileValidation, createProfile);
  * @access  Private
  */
 router.get('/', protect, getProfiles);
+
+/**
+ * @route   GET /api/v1/profiles/:id/history
+ * @desc    Busca o histórico de atividades de um perfil de cliente
+ * @access  Private
+ */
+router.get('/:id/history', protect, getProfileHistory);
 
 
 export default router;

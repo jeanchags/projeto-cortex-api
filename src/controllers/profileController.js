@@ -1,11 +1,15 @@
 /**
  * @fileoverview Controller para gerenciar perfis de clientes.
- * @version 1.2
+ * @version 1.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
 import { validationResult } from 'express-validator';
 import Profile from '../models/Profile.js';
+import Submission from '../models/Submission.js';
+import Report from '../models/Reports.js';
+import mongoose from 'mongoose';
+
 
 /**
  * @function createProfile
@@ -85,6 +89,65 @@ export const getProfiles = async (req, res) => {
 
     } catch (error) {
         console.error('Erro ao buscar perfis:', error);
+        res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    }
+};
+
+/**
+ * @function getProfileHistory
+ * @description Retorna o histórico de atividades (submissões e relatórios) de um perfil.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
+ */
+export const getProfileHistory = async (req, res) => {
+    try {
+        const { id: profileId } = req.params;
+        const userId = req.user.id;
+
+        // 1. Validação de Propriedade
+        const profile = await Profile.findOne({ _id: profileId, managedBy: userId });
+        if (!profile) {
+            return res.status(404).json({ message: 'Perfil não encontrado ou não pertence ao usuário.' });
+        }
+
+        // 2. Consulta de Submissões e Relatórios em paralelo
+        const [submissions, reports] = await Promise.all([
+            Submission.find({ profileId: profileId }).lean(),
+            Report.find({ submissionId: { $in: await Submission.find({ profileId: profileId }).distinct('_id') } }).lean()
+        ]);
+
+
+        // 3. Unificação e Formatação
+        const submissionEvents = submissions.map(sub => ({
+            id: sub._id,
+            type: 'submission',
+            date: sub.submittedAt,
+            details: {
+                formVersion: sub.formVersion
+            }
+        }));
+
+        const reportEvents = reports.map(rep => ({
+            id: rep._id,
+            type: 'report',
+            date: rep.generatedAt,
+            details: {
+                submissionId: rep.submissionId
+            }
+        }));
+
+        // 4. Ordenação
+        const history = [...submissionEvents, ...reportEvents];
+        history.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // 5. Resposta
+        res.status(200).json(history);
+
+    } catch (error) {
+        console.error('Erro ao buscar histórico do perfil:', error);
+        if (error instanceof mongoose.Error.CastError) {
+            return res.status(404).json({ message: 'Perfil não encontrado ou não pertence ao usuário.' });
+        }
         res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
 };
