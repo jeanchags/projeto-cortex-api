@@ -37,12 +37,37 @@ describe('User Model Test', () => {
         
         // 1. Cria o primeiro usuário com sucesso
         await User.create(userData);
-    
-        // 2. Tenta salvar um segundo usuário com o mesmo e-mail.
-        // CORREÇÃO: Usando a sintaxe `rejects.toThrow()` para um teste mais limpo e declarativo.
-        // O Jest irá garantir que a promessa é rejeitada, evitando a falha de "zero assertions".
-        const user2 = new User(userData);
-        await expect(user2.save()).rejects.toThrow(/E11000 duplicate key error/);
+
+        const maxRetries = 10;
+        const retryDelay = 50; // ms
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // 2. Tenta salvar o usuário duplicado
+                const user2 = new User(userData);
+                await user2.save();
+
+                // Se chegou aqui, o índice ainda não está ativo.
+                // Se for a última tentativa, força a falha do teste.
+                if (attempt === maxRetries) {
+                    fail('O índice unique de e-mail não foi aplicado a tempo.');
+                }
+
+                // Aguarda um pouco antes da próxima tentativa
+                await new Promise(res => setTimeout(res, retryDelay));
+
+            } catch (error) {
+                // 3. Verifica se a falha ocorreu pelo motivo esperado
+                if (error.code === 11000) {
+                    // SUCESSO! O índice funcionou. Podemos confirmar e sair.
+                    expect(error.code).toBe(11000);
+                    return; // Encerra o teste com sucesso.
+                }
+
+                // Se o erro for outro, algo inesperado aconteceu. Falha imediatamente.
+                throw error;
+            }
+        }
     });
 
     it('should fail to create a user with an invalid role', async () => {
