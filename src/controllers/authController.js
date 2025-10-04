@@ -1,6 +1,6 @@
 /**
  * @fileoverview Controller para gerenciar autenticação de usuários.
- * @version 1.4
+ * @version 1.5
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import { validationResult } from 'express-validator';
@@ -189,6 +189,55 @@ export const forgotPassword = async (req, res) => {
 
     } catch (error) {
         console.error('Erro ao solicitar redefinição de senha:', error);
+        return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    }
+};
+
+/**
+ * @function resetPassword
+ * @description Reseta a senha do usuário a partir de um token.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
+ */
+export const resetPassword = async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({
+            message: 'A validação dos dados falhou.',
+            details: errors.array(),
+        });
+    }
+
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpires: { $gt: Date.now() },
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Token inválido ou expirado.' });
+        }
+
+        user.password = password;
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            data: 'Senha redefinida com sucesso.',
+        });
+    } catch (error) {
+        console.error('Erro ao resetar a senha:', error);
         return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
 };
