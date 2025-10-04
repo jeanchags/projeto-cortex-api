@@ -1,6 +1,6 @@
 /**
  * @fileoverview Controller para gerenciar autenticação de usuários.
- * @version 1.1
+ * @version 1.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import { validationResult } from 'express-validator';
@@ -93,6 +93,34 @@ export const login = async (req, res) => {
         }
 
         console.error('Erro no login do usuário:', error);
+        return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    }
+};
+
+/**
+ * @function verifyEmail
+ * @description Verifica o e-mail de um usuário a partir de um token.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
+ */
+export const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        const user = await User.findById(token);
+
+        if (!user) {
+            return res.status(400).json({ message: 'Token de verificação inválido.' });
+        }
+
+        user.isVerified = true;
+        await user.save();
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/login?verified=true`);
+
+    } catch (error) {
+        console.error('Erro na verificação de e-mail:', error);
         return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
 };

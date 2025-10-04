@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação.
- * @version 2.1
+ * @version 2.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
@@ -152,6 +152,40 @@ describe('Auth Routes Integration Test', () => {
                 });
             expect(res.statusCode).toEqual(400);
             expect(res.body.details[0].path).toBe('email');
+        });
+    });
+
+    describe('GET /api/v1/auth/verify-email/:token', () => {
+        let user;
+
+        beforeEach(async () => {
+            await User.deleteMany({});
+            user = await new User({
+                name: 'Usuario para verificar',
+                email: 'verificar@email.com',
+                password: 'password123',
+                isVerified: false,
+            }).save();
+        });
+
+        it('should verify the user and redirect to the frontend login page', async () => {
+            const res = await request(app)
+                .get(`/api/v1/auth/verify-email/${user._id}`);
+
+            expect(res.statusCode).toEqual(302); // 302 is the status code for redirection
+            expect(res.headers.location).toBe('http://localhost:3000/login?verified=true');
+
+            const updatedUser = await User.findById(user._id);
+            expect(updatedUser.isVerified).toBe(true);
+        });
+
+        it('should return 400 for an invalid verification token', async () => {
+            const invalidToken = new mongoose.Types.ObjectId();
+            const res = await request(app)
+                .get(`/api/v1/auth/verify-email/${invalidToken}`);
+
+            expect(res.statusCode).toEqual(400);
+            expect(res.body.message).toBe('Token de verificação inválido.');
         });
     });
 });

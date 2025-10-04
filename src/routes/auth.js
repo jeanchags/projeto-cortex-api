@@ -1,11 +1,11 @@
 /**
  * @fileoverview Rotas para o recurso de autenticação (auth).
- * @version 2.0
+ * @version 2.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import express from 'express';
 import { check } from 'express-validator';
-import { register, login } from '../controllers/authController.js';
+import { register, login, verifyEmail } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -35,5 +35,13 @@ router.post('/register', registerValidation, register);
  * @access  Public
  */
 router.post('/login', loginValidation, login);
+
+/**
+ * @route   GET /api/v1/auth/verify-email/:token
+ * @desc    Verifica o e-mail de um usuário
+ * @access  Public
+ */
+router.get('/verify-email/:token', verifyEmail);
+
 
 export default router;
