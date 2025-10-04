@@ -1,6 +1,6 @@
 /**
  * @fileoverview Schema e Modelo do Usuário para o MongoDB usando Mongoose.
- * @version 1.3
+ * @version 1.4
  * @author Jean Chagas Fernandes - Studio Fix
  */
 
@@ -72,10 +72,35 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: {
-            values: ['ADMIN', 'COMMON'], // Conforme arquitetura  (e spec [cite: 237] que usa 'COMMON', mas o enum atual só tem ADMIN/COMMON)
+            values: ['ADMIN', 'COMMON'], // Conforme arquitetura
             message: 'A função `{VALUE}` não é válida.',
         },
         default: 'COMMON',
+    },
+
+    /**
+     * Indica se o e-mail do usuário foi verificado.
+     * @type {boolean}
+     */
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
+
+    /**
+     * Token para redefinição de senha.
+     * @type {string}
+     */
+    passwordResetToken: {
+        type: String,
+    },
+
+    /**
+     * Data de expiração do token de redefinição de senha.
+     * @type {Date}
+     */
+    passwordResetExpires: {
+        type: Date,
     },
 
     /**

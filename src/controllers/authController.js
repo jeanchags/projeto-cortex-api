@@ -1,10 +1,15 @@
+/**
+ * @fileoverview Controller para gerenciar autenticação de usuários.
+ * @version 1.1
+ * @author Jean Chagas Fernandes - Studio Fix
+ */
 import { validationResult } from 'express-validator';
 import * as authService from '../services/authService.js';
 import User from '../models/User.js';
 
 /**
  * @function register
- * @description Registra um novo usuário no sistema.
+ * @description Registra um novo usuário e inicia o fluxo de verificação de e-mail.
  * @param {object} req - O objeto de requisição do Express.
  * @param {object} res - O objeto de resposta do Express.
  */
@@ -25,16 +30,24 @@ export const register = async (req, res) => {
             return res.status(409).json({ message: 'E-mail já cadastrado.' });
         }
 
-        const { newUser, token } = await authService.registerUser({ name, email, password });
+        const newUser = await User.create({ name, email, password });
 
+        // Gera o token de verificação (usando o _id do usuário para simplicidade)
+        const verificationToken = newUser._id;
+
+        // Monta a URL de verificação
+        const verificationUrl = `http://localhost:3001/verify-email/${verificationToken}`;
+
+        // Log da URL para fins de depuração
+        console.log(`URL de Verificação Gerada: ${verificationUrl}`);
+
+        // TODO: Implementar serviço de e-mail para enviar token de verificação
+        // Exemplo: await emailService.sendVerificationEmail(newUser.email, verificationUrl);
+
+        // Responde ao cliente sem o token de login
         return res.status(201).json({
-            message: 'Usuário registrado com sucesso!',
-            user: {
-                id: newUser._id,
-                name: newUser.name,
-                email: newUser.email,
-            },
-            token,
+            success: true,
+            data: 'Usuário registrado com sucesso. Por favor, verifique seu e-mail para ativar sua conta.',
         });
 
     } catch (error) {

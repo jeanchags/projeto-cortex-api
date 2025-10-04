@@ -1,24 +1,21 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação.
- * @version 2.0
+ * @version 2.1
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
 import mongoose from 'mongoose';
-// import bcrypt from 'bcryptjs'; // Não é mais necessário aqui
 import { app } from '../../src/app.js';
 import User from '../../src/models/User.js';
 
 describe('Auth Routes Integration Test', () => {
-    // ... (O describe 'POST /api/v1/auth/register' está correto) ...
 
     describe('POST /api/v1/auth/register', () => {
-        // Limpa a coleção antes de cada teste de registro
         beforeEach(async () => {
             await User.deleteMany({});
         });
 
-        it('should register a new user successfully and return 201 status', async () => {
+        it('should register a new user and return a verification message', async () => {
             const res = await request(app)
                 .post('/api/v1/auth/register')
                 .send({
@@ -28,19 +25,23 @@ describe('Auth Routes Integration Test', () => {
                 });
 
             expect(res.statusCode).toEqual(201);
-            expect(res.body).toHaveProperty('token');
-            expect(res.body.user.name).toBe('Carlos Silva');
+            expect(res.body).not.toHaveProperty('token');
+            expect(res.body.success).toBe(true);
+            expect(res.body.data).toBe('Usuário registrado com sucesso. Por favor, verifique seu e-mail para ativar sua conta.');
+
+            const userInDb = await User.findOne({ email: 'carlos.silva@email.com' });
+            expect(userInDb).toBeDefined();
+            expect(userInDb.isVerified).toBe(false);
         });
 
         it('should return 409 if email is already in use', async () => {
             const userData = {
                 name: 'Usuario Existente',
                 email: 'existente@email.com',
-                password: 'password123', // Senha válida
+                password: 'password123',
             };
-            await new User(userData).save(); // Salva diretamente no banco
+            await new User(userData).save();
 
-            // Tenta registrar com o mesmo e-mail
             const res = await request(app).post('/api/v1/auth/register').send(userData);
 
             expect(res.statusCode).toEqual(409);
@@ -75,25 +76,16 @@ describe('Auth Routes Integration Test', () => {
     });
 
 
-    /**
-     * Testes para o endpoint de Login de Usuário
-     */
     describe('POST /api/v1/auth/login', () => {
         const testUserEmail = 'login.teste@email.com';
         const testUserPassword = 'password123';
 
-        // Hook que roda ANTES de cada teste DESTE GRUPO ('login').
-        // Garante que o usuário de teste exista.
         beforeEach(async () => {
             await User.deleteMany({});
-
-            // CORREÇÃO: Não fazer o hash manualmente.
-            // Salvar com a senha em texto plano e deixar o hook 'pre-save'
-            // do modelo User fazer o hash.
             await new User({
                 name: 'Usuario de Teste Login',
                 email: testUserEmail,
-                password: testUserPassword, // Salvar a senha em texto plano
+                password: testUserPassword,
             }).save();
         });
 

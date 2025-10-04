@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de unidade para o modelo User.
- * @version 2.2
+ * @version 2.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import mongoose from 'mongoose';
@@ -12,7 +12,7 @@ describe('User Model Test', () => {
         await User.createIndexes();
     });
 
-    it('should create a user successfully with all valid data', async () => {
+    it('should create a user successfully and initialize new fields with default values', async () => {
         const userData = {
             name: 'João da Silva',
             email: 'joao.silva@email.com',
@@ -21,9 +21,16 @@ describe('User Model Test', () => {
         };
         const user = new User(userData);
         const savedUser = await user.save();
+
+        // Validações existentes
         expect(savedUser._id).toBeDefined();
         expect(savedUser.name).toBe(userData.name);
         expect(savedUser.email).toBe(userData.email);
+
+        // Validações dos novos campos
+        expect(savedUser.isVerified).toBe(false);
+        expect(savedUser.passwordResetToken).toBeUndefined();
+        expect(savedUser.passwordResetExpires).toBeUndefined();
     });
 
     it('should fail to create a user without a required field (email)', async () => {
@@ -34,8 +41,7 @@ describe('User Model Test', () => {
 
     it('should fail to create a user with a duplicate email', async () => {
         const userData = { name: 'Duplicado', email: 'duplicado@email.com', password: 'password123' };
-        
-        // 1. Cria o primeiro usuário com sucesso
+
         await User.create(userData);
 
         const maxRetries = 10;
@@ -43,28 +49,20 @@ describe('User Model Test', () => {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // 2. Tenta salvar o usuário duplicado
                 const user2 = new User(userData);
                 await user2.save();
 
-                // Se chegou aqui, o índice ainda não está ativo.
-                // Se for a última tentativa, força a falha do teste.
                 if (attempt === maxRetries) {
                     fail('O índice unique de e-mail não foi aplicado a tempo.');
                 }
 
-                // Aguarda um pouco antes da próxima tentativa
                 await new Promise(res => setTimeout(res, retryDelay));
 
             } catch (error) {
-                // 3. Verifica se a falha ocorreu pelo motivo esperado
                 if (error.code === 11000) {
-                    // SUCESSO! O índice funcionou. Podemos confirmar e sair.
                     expect(error.code).toBe(11000);
-                    return; // Encerra o teste com sucesso.
+                    return;
                 }
-
-                // Se o erro for outro, algo inesperado aconteceu. Falha imediatamente.
                 throw error;
             }
         }
