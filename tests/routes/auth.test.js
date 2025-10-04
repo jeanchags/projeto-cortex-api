@@ -1,6 +1,6 @@
 /**
  * @fileoverview Testes de integração para as rotas de autenticação.
- * @version 2.2
+ * @version 2.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import request from 'supertest';
@@ -86,10 +86,11 @@ describe('Auth Routes Integration Test', () => {
                 name: 'Usuario de Teste Login',
                 email: testUserEmail,
                 password: testUserPassword,
+                isVerified: true, // Garante que o usuário para os testes existentes esteja verificado
             }).save();
         });
 
-        it('should login successfully and return 200 status with a token', async () => {
+        it('should login successfully and return 200 status with a token for a verified user', async () => {
             const res = await request(app)
                 .post('/api/v1/auth/login')
                 .send({
@@ -100,6 +101,32 @@ describe('Auth Routes Integration Test', () => {
             expect(res.body).toHaveProperty('token');
             expect(res.body.user.email).toBe(testUserEmail);
         });
+
+        // --- NOVO TESTE ---
+        it('should return 403 for an unverified user', async () => {
+            const unverifiedEmail = 'nao.verificado@email.com';
+            await new User({
+                name: 'Usuario Nao Verificado',
+                email: unverifiedEmail,
+                password: 'password123',
+                isVerified: false,
+            }).save();
+
+            const res = await request(app)
+                .post('/api/v1/auth/login')
+                .send({
+                    email: unverifiedEmail,
+                    password: 'password123',
+                });
+
+            expect(res.statusCode).toEqual(403);
+            expect(res.body).not.toHaveProperty('token');
+            expect(res.body).toEqual({
+                success: false,
+                error: "Por favor, verifique seu e-mail para ativar sua conta."
+            });
+        });
+        // --- FIM DO NOVO TESTE ---
 
         it('should return 401 for incorrect password', async () => {
             const res = await request(app)

@@ -1,10 +1,11 @@
 /**
  * @fileoverview Controller para gerenciar autenticação de usuários.
- * @version 1.2
+ * @version 1.3
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import { validationResult } from 'express-validator';
-import * as authService from '../services/authService.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 /**
@@ -75,7 +76,37 @@ export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const { user, token } = await authService.loginUser({ email, password });
+        // Procura o usuário pelo e-mail e seleciona explicitamente o campo de senha.
+        const user = await User.findOne({ email }).select('+password');
+        if (!user) {
+            return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+        }
+
+        // --- INÍCIO DA IMPLEMENTAÇÃO: Verificação de status do e-mail ---
+        // Verifica se o e-mail do usuário foi verificado.
+        if (!user.isVerified) {
+            return res.status(403).json({
+                success: false,
+                error: "Por favor, verifique seu e-mail para ativar sua conta."
+            });
+        }
+        // --- FIM DA IMPLEMENTAÇÃO ---
+
+        // Compara a senha fornecida com a senha armazenada (hashed)
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
+        }
+
+        const payload = {
+            user: {
+                id: user.id,
+            },
+        };
+
+        const token = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: process.env.JWT_EXPIRES_IN,
+        });
 
         return res.status(200).json({
             message: 'Login realizado com sucesso!',
@@ -88,10 +119,6 @@ export const login = async (req, res) => {
         });
 
     } catch (error) {
-        if (error.message === 'Credenciais inválidas' || error.message === 'Usuário não encontrado') {
-            return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
-        }
-
         console.error('Erro no login do usuário:', error);
         return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
