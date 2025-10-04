@@ -1,11 +1,12 @@
 /**
  * @fileoverview Controller para gerenciar autenticação de usuários.
- * @version 1.3
+ * @version 1.4
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/User.js';
 
 /**
@@ -148,6 +149,46 @@ export const verifyEmail = async (req, res) => {
 
     } catch (error) {
         console.error('Erro na verificação de e-mail:', error);
+        return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
+    }
+};
+
+/**
+ * @function forgotPassword
+ * @description Gera e envia um token de redefinição de senha.
+ * @param {object} req - O objeto de requisição do Express.
+ * @param {object} res - O objeto de resposta do Express.
+ */
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (user) {
+            const token = crypto.randomBytes(20).toString('hex');
+
+            user.passwordResetToken = crypto
+                .createHash('sha256')
+                .update(token)
+                .digest('hex');
+
+            user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutos
+
+            await user.save();
+
+            const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+
+            // TODO: Implementar serviço de e-mail para enviar token de recuperação
+            console.log(`URL de Redefinição de Senha: ${resetUrl}`);
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: 'E-mail para redefinição de senha enviado com sucesso.',
+        });
+
+    } catch (error) {
+        console.error('Erro ao solicitar redefinição de senha:', error);
         return res.status(500).json({ message: 'Ocorreu um erro interno no servidor.' });
     }
 };

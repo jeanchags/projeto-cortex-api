@@ -1,11 +1,11 @@
 /**
  * @fileoverview Rotas para o recurso de autenticação (auth).
- * @version 2.1
+ * @version 2.2
  * @author Jean Chagas Fernandes - Studio Fix
  */
 import express from 'express';
 import { check } from 'express-validator';
-import { register, login, verifyEmail } from '../controllers/authController.js';
+import { register, login, verifyEmail, forgotPassword } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -42,6 +42,13 @@ router.post('/login', loginValidation, login);
  * @access  Public
  */
 router.get('/verify-email/:token', verifyEmail);
+
+/**
+ * @route   POST /api/v1/auth/forgot-password
+ * @desc    Inicia o fluxo de recuperação de senha
+ * @access  Public
+ */
+router.post('/forgot-password', [check('email').isEmail()], forgotPassword);
 
 
 export default router;
